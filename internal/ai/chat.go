@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/openilink/openilink-hub/internal/database"
 )
@@ -79,8 +80,15 @@ func Complete(ctx context.Context, cfg database.AIConfig, db *database.DB, botID
 	messages = append(messages, chatMessage{Role: "user", Content: text})
 
 	// Call API
+	endpoint := strings.TrimRight(baseURL, "/")
+	// Auto-append /v1 if base URL doesn't end with it
+	if !strings.HasSuffix(endpoint, "/v1") {
+		endpoint += "/v1"
+	}
+	endpoint += "/chat/completions"
+
 	reqBody, _ := json.Marshal(chatRequest{Model: model, Messages: messages})
-	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+"/chat/completions", bytes.NewReader(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(reqBody))
 	if err != nil {
 		return "", err
 	}
@@ -94,19 +102,31 @@ func Complete(ctx context.Context, cfg database.AIConfig, db *database.DB, botID
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("ai api returned %d: %s", resp.StatusCode, truncate(string(body), 200))
+	}
+
 	var result chatResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("ai response parse failed: %w", err)
+		return "", fmt.Errorf("ai response parse failed (not JSON): %s", truncate(string(body), 200))
 	}
 
 	if result.Error != nil {
 		return "", fmt.Errorf("ai error: %s", result.Error.Message)
 	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("ai returned no choices")
+	if len(result.Choices) == 0 || result.Choices[0].Message.Content == "" {
+		return "", fmt.Errorf("ai returned empty response")
 	}
 
 	return result.Choices[0].Message.Content, nil
+}
+
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 func extractContent(payload json.RawMessage) string {
