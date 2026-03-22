@@ -239,18 +239,37 @@ func isVoiceFile(filename string) bool {
 		strings.HasSuffix(lower, ".pcm")
 }
 
-// extractPCMFromWAV parses WAV and returns PCM data and sample rate.
-// Falls back to raw data with 24kHz if not a valid WAV.
-func extractPCMFromWAV(data []byte) (pcm []byte, sampleRate int) {
+// wavInfo holds parsed WAV header information.
+type wavInfo struct {
+	SampleRate    int
+	Channels      int
+	BitsPerSample int
+	PCMData       []byte
+}
+
+// parseWAV parses a WAV file and extracts PCM data and format info.
+func parseWAV(data []byte) (*wavInfo, error) {
 	if len(data) < 44 || string(data[:4]) != "RIFF" {
-		return data, 24000
+		return &wavInfo{SampleRate: 24000, Channels: 1, BitsPerSample: 16, PCMData: data}, nil
 	}
-	// Read sample rate from WAV header (bytes 24-27, little-endian)
-	sampleRate = int(data[24]) | int(data[25])<<8 | int(data[26])<<16 | int(data[27])<<24
-	if sampleRate <= 0 {
-		sampleRate = 24000
+
+	info := &wavInfo{}
+	// fmt chunk info (standard positions in WAV header)
+	info.Channels = int(data[22]) | int(data[23])<<8
+	info.SampleRate = int(data[24]) | int(data[25])<<8 | int(data[26])<<16 | int(data[27])<<24
+	info.BitsPerSample = int(data[34]) | int(data[35])<<8
+
+	if info.SampleRate <= 0 {
+		info.SampleRate = 24000
 	}
-	// Find "data" chunk — not always at offset 44
+	if info.Channels <= 0 {
+		info.Channels = 1
+	}
+	if info.BitsPerSample <= 0 {
+		info.BitsPerSample = 16
+	}
+
+	// Find "data" chunk
 	for i := 12; i+8 < len(data); {
 		chunkID := string(data[i : i+4])
 		chunkSize := int(data[i+4]) | int(data[i+5])<<8 | int(data[i+6])<<16 | int(data[i+7])<<24
@@ -260,24 +279,55 @@ func extractPCMFromWAV(data []byte) (pcm []byte, sampleRate int) {
 			if end > len(data) {
 				end = len(data)
 			}
-			return data[start:end], sampleRate
+			info.PCMData = data[start:end]
+			return info, nil
 		}
 		i += 8 + chunkSize
 		if chunkSize%2 != 0 {
-			i++ // padding byte
+			i++
 		}
 	}
-	// Fallback: skip standard 44-byte header
-	return data[44:], sampleRate
+	info.PCMData = data[44:]
+	return info, nil
+}
+
+// stereoToMono converts 16-bit stereo PCM to mono by averaging L+R.
+func stereoToMono(pcm []byte) []byte {
+	mono := make([]byte, len(pcm)/2)
+	for i := 0; i+3 < len(pcm); i += 4 {
+		l := int16(pcm[i]) | int16(pcm[i+1])<<8
+		r := int16(pcm[i+2]) | int16(pcm[i+3])<<8
+		m := int16((int32(l) + int32(r)) / 2)
+		j := i / 2
+		mono[j] = byte(m)
+		mono[j+1] = byte(m >> 8)
+	}
+	return mono
 }
 
 // sendVoice encodes audio to SILK, uploads to CDN, and sends as voice message.
 func (p *Provider) sendVoice(ctx context.Context, recipient, contextToken string, data []byte) (string, error) {
-	pcm, wavRate := extractPCMFromWAV(data)
+	wav, err := parseWAV(data)
+	if err != nil {
+		return "", fmt.Errorf("parse wav: %w", err)
+	}
 
-	// Encode PCM → SILK (use source sample rate)
-	slog.Info("voice encode", "pcm_bytes", len(pcm), "wav_rate", wavRate)
-	silkData, err := silk.Encode(bytes.NewReader(pcm), silk.SampleRate(wavRate), silk.Stx(true))
+	pcm := wav.PCMData
+	slog.Info("voice encode", "pcm_bytes", len(pcm), "sample_rate", wav.SampleRate,
+		"channels", wav.Channels, "bits", wav.BitsPerSample)
+
+	// Convert stereo to mono (SILK requires mono)
+	if wav.Channels == 2 && wav.BitsPerSample == 16 {
+		pcm = stereoToMono(pcm)
+		slog.Info("voice stereo→mono", "mono_bytes", len(pcm))
+	}
+
+	// Encode PCM → SILK
+	silkData, err := silk.Encode(bytes.NewReader(pcm), silk.SampleRate(wav.SampleRate), silk.Stx(true))
+	if err != nil {
+		return "", fmt.Errorf("silk encode (rate=%d, pcm=%d bytes): %w", wav.SampleRate, len(pcm), err)
+	}
+	slog.Info("voice silk encoded", "silk_bytes", len(silkData), "header", fmt.Sprintf("%x", silkData[:min(10, len(silkData))]))
 	if err != nil {
 		return "", fmt.Errorf("silk encode: %w", err)
 	}
@@ -305,7 +355,7 @@ func (p *Provider) sendVoice(ctx context.Context, recipient, contextToken string
 						AESKey:            base64.StdEncoding.EncodeToString([]byte(uploaded.AESKey)),
 					},
 					EncodeType: 4, // SILK with STX
-					SampleRate: wavRate,
+					SampleRate: wav.SampleRate,
 				},
 			}},
 		},
