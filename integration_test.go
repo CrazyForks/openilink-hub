@@ -1268,3 +1268,88 @@ func TestChannelHTTPDisabledChannel(t *testing.T) {
 	assertCode(t, "disabled channel", resp.StatusCode, 401)
 	resp.Body.Close()
 }
+
+// ==================== AI context isolation ====================
+
+func TestAIContextIsolation(t *testing.T) {
+	env := setup(t)
+	defer env.close()
+
+	env.register("aiuser", "password123")
+	botObj := env.createBotForUser("Bot1")
+	ch1, _ := env.db.CreateChannel(botObj.ID, "Support", "support", nil, nil)
+	ch2, _ := env.db.CreateChannel(botObj.ID, "Sales", "sales", nil, nil)
+
+	sender := "user@wechat"
+	ch1ID := ch1.ID
+	ch2ID := ch2.ID
+	payload, _ := json.Marshal(map[string]string{"content": "hello"})
+
+	// Inbound messages routed to ch1
+	for i := 0; i < 3; i++ {
+		env.db.SaveMessage(&database.Message{
+			BotID: botObj.ID, ChannelID: &ch1ID, Direction: "inbound", Sender: sender,
+			MsgType: "text", Payload: payload,
+		})
+	}
+
+	// Inbound messages routed to ch2
+	for i := 0; i < 2; i++ {
+		env.db.SaveMessage(&database.Message{
+			BotID: botObj.ID, ChannelID: &ch2ID, Direction: "inbound", Sender: sender,
+			MsgType: "text", Payload: payload,
+		})
+	}
+
+	// Outbound from ch1 (AI reply)
+	reply1, _ := json.Marshal(map[string]string{"content": "support reply"})
+	env.db.SaveMessage(&database.Message{
+		BotID: botObj.ID, ChannelID: &ch1ID, Direction: "outbound",
+		Recipient: sender, MsgType: "text", Payload: reply1,
+	})
+
+	// Outbound from ch2 (AI reply)
+	reply2, _ := json.Marshal(map[string]string{"content": "sales reply"})
+	env.db.SaveMessage(&database.Message{
+		BotID: botObj.ID, ChannelID: &ch2ID, Direction: "outbound",
+		Recipient: sender, MsgType: "text", Payload: reply2,
+	})
+
+	// ch1 context: 3 inbound + 1 outbound = 4
+	msgs1, err := env.db.ListChannelMessages(ch1.ID, sender, 50)
+	if err != nil {
+		t.Fatalf("ListChannelMessages ch1: %v", err)
+	}
+	if len(msgs1) != 4 {
+		t.Errorf("ch1 context: want 4, got %d", len(msgs1))
+	}
+	for _, m := range msgs1 {
+		var p struct{ Content string }
+		json.Unmarshal(m.Payload, &p)
+		if p.Content == "sales reply" {
+			t.Error("ch1 should NOT contain sales reply")
+		}
+	}
+
+	// ch2 context: 2 inbound + 1 outbound = 3
+	msgs2, err := env.db.ListChannelMessages(ch2.ID, sender, 50)
+	if err != nil {
+		t.Fatalf("ListChannelMessages ch2: %v", err)
+	}
+	if len(msgs2) != 3 {
+		t.Errorf("ch2 context: want 3, got %d", len(msgs2))
+	}
+	for _, m := range msgs2 {
+		var p struct{ Content string }
+		json.Unmarshal(m.Payload, &p)
+		if p.Content == "support reply" {
+			t.Error("ch2 should NOT contain support reply")
+		}
+	}
+
+	// Different sender sees nothing
+	msgs3, _ := env.db.ListChannelMessages(ch1.ID, "other@wechat", 50)
+	if len(msgs3) != 0 {
+		t.Errorf("other sender: want 0, got %d", len(msgs3))
+	}
+}

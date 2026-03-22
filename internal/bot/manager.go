@@ -167,35 +167,13 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 	}
 	payload, _ := json.Marshal(payloadMap)
 
-	dbMsg := &database.Message{
-		BotID:     inst.DBID,
-		Direction: "inbound",
-		Sender:    msg.Sender,
-		Recipient: msg.Recipient,
-		MsgType:   msgType,
-		Payload:   payload,
-	}
-	seqID, _ := m.db.SaveMessage(dbMsg)
 	_ = m.db.IncrBotMsgCount(inst.DBID)
 
-	// Build relay envelope
+	// Build relay items (shared across channels)
 	items := make([]relay.MessageItem, len(msg.Items))
 	for i, item := range msg.Items {
 		items[i] = convertRelayItem(item)
 	}
-
-	env := relay.NewEnvelope("message", relay.MessageData{
-		SeqID:        seqID,
-		ExternalID:   msg.ExternalID,
-		Sender:       msg.Sender,
-		Recipient:    msg.Recipient,
-		GroupID:      msg.GroupID,
-		Timestamp:    msg.Timestamp,
-		MessageState: msg.MessageState,
-		Items:        items,
-		ContextToken: msg.ContextToken,
-		SessionID:    msg.SessionID,
-	})
 
 	// Load channels and route
 	channels, err := m.db.ListChannelsByBot(inst.DBID)
@@ -225,16 +203,40 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		}
 	}
 
-	// Deliver to all sinks
+	// Deliver to all sinks — save per-channel inbound message
 	for _, ch := range matched {
+		chID := ch.ID
+		seqID, _ := m.db.SaveMessage(&database.Message{
+			BotID:     inst.DBID,
+			ChannelID: &chID,
+			Direction: "inbound",
+			Sender:    msg.Sender,
+			Recipient: msg.Recipient,
+			MsgType:   msgType,
+			Payload:   payload,
+		})
 		_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
+
+		// Update envelope with this channel's seq_id
+		chEnv := relay.NewEnvelope("message", relay.MessageData{
+			SeqID:        seqID,
+			ExternalID:   msg.ExternalID,
+			Sender:       msg.Sender,
+			Recipient:    msg.Recipient,
+			GroupID:      msg.GroupID,
+			Timestamp:    msg.Timestamp,
+			MessageState: msg.MessageState,
+			Items:        items,
+			ContextToken: msg.ContextToken,
+			SessionID:    msg.SessionID,
+		})
 
 		d := sink.Delivery{
 			BotDBID:  inst.DBID,
 			Provider: inst.Provider,
 			Channel:  ch,
 			Message:  msg,
-			Envelope: env,
+			Envelope: chEnv,
 			SeqID:    seqID,
 			MsgType:  msgType,
 			Content:  content,
