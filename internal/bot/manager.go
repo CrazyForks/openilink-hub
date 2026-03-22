@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"time"
 	"strings"
 	"sync"
 
@@ -301,7 +302,10 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 			}
 			ext := mediaExt(item.Type)
 			ct := mediaContentType(item.Type)
-			key := fmt.Sprintf("%s/%s/%d%s", inst.DBID, msg.ExternalID, i, ext)
+			now := time.Now()
+			key := fmt.Sprintf("%s/%d/%02d/%02d/%s_%d%s",
+				inst.DBID, now.Year(), now.Month(), now.Day(),
+				msg.ExternalID, i, ext)
 			url, err := m.store.Put(ctx, key, ct, data)
 			if err != nil {
 				slog.Error("media store failed", "bot", inst.DBID, "key", key, "err", err)
