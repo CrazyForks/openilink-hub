@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 )
@@ -95,11 +96,19 @@ func (db *DB) ListChannelsByBotIDs(botIDs []string) ([]Channel, error) {
 	if len(botIDs) == 0 {
 		return nil, nil
 	}
-	// Build query with ANY
-	rows, err := db.Query(
-		"SELECT "+channelSelectCols+" FROM channels WHERE bot_id = ANY($1) ORDER BY created_at",
-		botIDs,
-	)
+	// Build query with IN ($1, $2, ...) since database/sql doesn't support ANY with slices
+	query := "SELECT " + channelSelectCols + " FROM channels WHERE bot_id IN ("
+	args := make([]any, len(botIDs))
+	for i, id := range botIDs {
+		if i > 0 {
+			query += ", "
+		}
+		query += fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	query += ") ORDER BY created_at"
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
