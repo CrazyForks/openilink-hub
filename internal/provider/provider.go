@@ -90,6 +90,10 @@ type Media struct {
 	MediaType         string `json:"media_type,omitempty"` // "image", "voice", "file", "video"
 	// Voice-specific
 	PlayTime int `json:"play_time,omitempty"` // seconds
+	// Video/image thumbnail
+	ThumbEQP    string `json:"thumb_eqp,omitempty"`
+	ThumbAESKey string `json:"thumb_aes_key,omitempty"`
+	ThumbURL    string `json:"thumb_url,omitempty"`
 	// Video-specific
 	PlayLength  int `json:"play_length,omitempty"` // seconds
 	ThumbWidth  int `json:"thumb_width,omitempty"`

@@ -315,6 +315,10 @@ func convertItem(item ilink.MessageItem) *provider.MessageItem {
 				}
 				mi.Media.ThumbWidth = item.ImageItem.ThumbWidth
 				mi.Media.ThumbHeight = item.ImageItem.ThumbHeight
+				if item.ImageItem.ThumbMedia != nil {
+					mi.Media.ThumbEQP = item.ImageItem.ThumbMedia.EncryptQueryParam
+					mi.Media.ThumbAESKey = item.ImageItem.ThumbMedia.AESKey
+				}
 			}
 		}
 
@@ -344,6 +348,10 @@ func convertItem(item ilink.MessageItem) *provider.MessageItem {
 				mi.Media.PlayLength = item.VideoItem.PlayLength
 				mi.Media.ThumbWidth = item.VideoItem.ThumbWidth
 				mi.Media.ThumbHeight = item.VideoItem.ThumbHeight
+				if item.VideoItem.ThumbMedia != nil {
+					mi.Media.ThumbEQP = item.VideoItem.ThumbMedia.EncryptQueryParam
+					mi.Media.ThumbAESKey = item.VideoItem.ThumbMedia.AESKey
+				}
 			}
 		}
 

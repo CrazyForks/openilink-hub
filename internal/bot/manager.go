@@ -464,15 +464,11 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 		}
 
 		if m.store != nil {
-			// Download media — voice gets SILK→WAV conversion
 			var data []byte
 			var err error
+
 			if item.Type == "voice" {
-				sampleRate := 24000
-				if item.Media.PlayTime > 0 {
-					sampleRate = 24000 // default
-				}
-				data, err = inst.Provider.DownloadVoice(ctx, item.Media.EncryptQueryParam, item.Media.AESKey, sampleRate)
+				data, err = m.downloadVoiceWithFallback(ctx, inst, item)
 			} else {
 				data, err = inst.Provider.DownloadMedia(ctx, item.Media.EncryptQueryParam, item.Media.AESKey)
 			}
@@ -494,6 +490,19 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 			item.Media.URL = url
 			item.Media.StorageKey = key
 			item.Media.FileSize = int64(len(data))
+
+			// Video/image: also download thumbnail if available
+			if (item.Type == "video" || item.Type == "image") && item.Media.ThumbEQP != "" {
+				thumbData, err := inst.Provider.DownloadMedia(ctx, item.Media.ThumbEQP, item.Media.ThumbAESKey)
+				if err == nil {
+					thumbKey := fmt.Sprintf("%s/%d/%02d/%02d/%s_%d_thumb.jpg",
+						inst.DBID, now.Year(), now.Month(), now.Day(),
+						msg.ExternalID, i)
+					if thumbURL, err := m.store.Put(ctx, thumbKey, "image/jpeg", thumbData); err == nil {
+						item.Media.ThumbURL = thumbURL
+					}
+				}
+			}
 		} else {
 			// Fallback: proxy URL via Hub
 			item.Media.URL = fmt.Sprintf("%s/api/v1/channels/media?eqp=%s&aes=%s&ct=%s",
@@ -501,6 +510,38 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 				mediaContentType(item.Type))
 		}
 	}
+}
+
+// downloadVoiceWithFallback tries SILK decode at 24kHz, then with item's SampleRate, then raw file.
+func (m *Manager) downloadVoiceWithFallback(ctx context.Context, inst *Instance, item *provider.MessageItem) ([]byte, error) {
+	eqp := item.Media.EncryptQueryParam
+	aes := item.Media.AESKey
+
+	// Try 1: SILK decode at 24kHz (most common)
+	data, err := inst.Provider.DownloadVoice(ctx, eqp, aes, 24000)
+	if err == nil {
+		slog.Info("voice decoded", "rate", 24000)
+		return data, nil
+	}
+	slog.Warn("voice decode 24kHz failed, trying fallback", "err", err)
+
+	// Try 2: SILK decode at 16kHz
+	data, err = inst.Provider.DownloadVoice(ctx, eqp, aes, 16000)
+	if err == nil {
+		slog.Info("voice decoded", "rate", 16000)
+		return data, nil
+	}
+	slog.Warn("voice decode 16kHz failed, storing raw", "err", err)
+
+	// Try 3: store raw file (SILK or whatever format)
+	data, err = inst.Provider.DownloadMedia(ctx, eqp, aes)
+	if err != nil {
+		return nil, err
+	}
+	// Change extension to .silk since we couldn't decode
+	item.Type = "file"
+	slog.Info("voice stored as raw file")
+	return data, nil
 }
 
 func mediaExt(itemType string) string {
