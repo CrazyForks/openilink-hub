@@ -338,11 +338,11 @@ func (p *Provider) sendVoice(ctx context.Context, recipient, contextToken string
 		return "", fmt.Errorf("upload voice: %w", err)
 	}
 
-	// Calculate play time in seconds from PCM data
+	// Calculate play time in milliseconds from PCM data
 	// PCM is 16-bit (2 bytes per sample), mono
-	playTime := len(pcm) / (2 * wav.SampleRate)
+	playTime := len(pcm) * 1000 / (2 * wav.SampleRate)
 	if playTime <= 0 {
-		playTime = 1
+		playTime = 1000
 	}
 
 	// Build and send voice message
