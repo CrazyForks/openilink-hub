@@ -29,6 +29,12 @@ func Middleware(db *database.DB) func(http.Handler) http.Handler {
 				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 				return
 			}
+			// Check user is active
+			user, err := db.GetUserByID(userID)
+			if err != nil || user.Status != database.StatusActive {
+				http.Error(w, `{"error":"account disabled"}`, http.StatusForbidden)
+				return
+			}
 			ctx := context.WithValue(r.Context(), userIDKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
