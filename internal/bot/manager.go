@@ -442,6 +442,15 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 			var err error
 
 			if item.Type == "voice" {
+				// Store raw SILK before decoding to WAV
+				rawSilk, rawErr := inst.Provider.DownloadMedia(ctx, item.Media.EncryptQueryParam, item.Media.AESKey)
+				if rawErr == nil && len(rawSilk) > 0 {
+					now := time.Now()
+					silkKey := fmt.Sprintf("%s/%d/%02d/%02d/%s_%d_raw.silk",
+						inst.DBID, now.Year(), now.Month(), now.Day(),
+						msg.ExternalID, i)
+					m.store.Put(ctx, silkKey, "audio/silk", rawSilk)
+				}
 				data, err = m.downloadVoiceWithFallback(ctx, inst, item)
 			} else {
 				data, err = inst.Provider.DownloadMedia(ctx, item.Media.EncryptQueryParam, item.Media.AESKey)
