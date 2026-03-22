@@ -96,6 +96,20 @@ func (db *DB) GetAllBots() ([]Bot, error) {
 	return bots, rows.Err()
 }
 
+// FindBotByCredential finds a bot by a JSON credential field (e.g. bot_id from iLink).
+func (db *DB) FindBotByCredential(key, value string) (*Bot, error) {
+	return scanBot(db.QueryRow(
+		"SELECT "+botSelectCols+" FROM bots WHERE credentials->>$1 = $2", key, value))
+}
+
+// UpdateBotCredentials updates credentials and resets status to connected.
+func (db *DB) UpdateBotCredentials(id string, credentials json.RawMessage) error {
+	_, err := db.Exec(
+		"UPDATE bots SET credentials = $1, status = 'connected', sync_state = '{}', updated_at = NOW() WHERE id = $2",
+		credentials, id)
+	return err
+}
+
 func (db *DB) UpdateBotName(id, name string) error {
 	_, err := db.Exec("UPDATE bots SET name = $1, updated_at = NOW() WHERE id = $2", name, id)
 	return err

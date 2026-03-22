@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Send, Cable, Copy, Check, Plus, Trash2, RotateCw, Radio, X, Bot, Webhook, Paperclip } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Send, Cable, Copy, Check, Plus, Trash2, RotateCw, Radio, X, Bot, Webhook, Paperclip, QrCode } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
@@ -80,6 +80,7 @@ function MessageContent({ m }: { m: Message }) {
 
 export function BotDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [bot, setBot] = useState<any>(null);
   const [channels, setChannels] = useState<any[]>([]);
   const [tab, setTab] = useState<"chat" | "channels">("chat");
@@ -89,6 +90,7 @@ export function BotDetailPage() {
   const [sendError, setSendError] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingPreview, setPendingPreview] = useState<string | null>(null);
+  const [showRebind, setShowRebind] = useState(false);
   const [nextCursor, setNextCursor] = useState<string>("");
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -250,7 +252,11 @@ export function BotDetailPage() {
       if (!res.ok) {
         const msg = data.error || "";
         if (msg.includes("context token")) return "请先从微信给 Bot 发一条消息";
-        if (msg.includes("not connected")) return "Bot 未连接";
+        if (msg.includes("session expired")) {
+          setShowRebind(true);
+          return "会话已过期";
+        }
+        if (msg.includes("not connected")) return "Bot 未连接，请尝试重连";
         return msg || "发送失败";
       }
       setTimeout(loadMessages, 500);
@@ -275,12 +281,36 @@ export function BotDetailPage() {
           <h2 className="font-semibold text-sm">{bot.name}</h2>
           <p className="text-xs text-muted-foreground font-mono truncate">{bot.extra?.bot_id}</p>
         </div>
-        <Badge variant={bot.status === "connected" ? "default" : "outline"}>{bot.status}</Badge>
+        <Badge variant={bot.status === "connected" ? "default" : bot.status === "session_expired" ? "destructive" : "outline"}>
+          {bot.status === "session_expired" ? "已过期" : bot.status}
+        </Badge>
+        {bot.status === "session_expired" && (
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => navigate("/")}>
+            <QrCode className="w-3.5 h-3.5 mr-1" /> 重新绑定
+          </Button>
+        )}
         <div className="flex border rounded-lg overflow-hidden">
           <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "chat" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("chat")}>消息</button>
           <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "channels" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("channels")}>通道</button>
         </div>
       </div>
+
+      {/* Session expired rebind dialog */}
+      {showRebind && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowRebind(false)}>
+          <div className="bg-background border rounded-xl p-6 max-w-sm mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 text-destructive">
+              <QrCode className="w-5 h-5" />
+              <h3 className="font-semibold text-sm">会话已过期</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">Bot 的微信登录会话已过期，需要重新扫码绑定。重新绑定后，现有通道和配置将自动保留。</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setShowRebind(false)}>稍后</Button>
+              <Button size="sm" onClick={() => navigate("/")}>去重新绑定</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {tab === "chat" ? (
         <div className="flex-1 flex flex-col overflow-hidden mt-3 rounded-xl border">

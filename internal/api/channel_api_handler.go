@@ -112,7 +112,12 @@ func (s *Server) handleChannelSend(w http.ResponseWriter, r *http.Request) {
 
 	inst, ok := s.BotManager.GetInstance(ch.BotID)
 	if !ok {
-		jsonError(w, "bot not connected", http.StatusServiceUnavailable)
+		bot, _ := s.DB.GetBot(ch.BotID)
+		if bot != nil && bot.Status == "session_expired" {
+			jsonError(w, "session expired", http.StatusConflict)
+		} else {
+			jsonError(w, "bot not connected", http.StatusServiceUnavailable)
+		}
 		return
 	}
 

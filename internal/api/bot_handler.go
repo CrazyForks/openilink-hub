@@ -133,19 +133,48 @@ func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 			j, _ := json.Marshal(map[string]string{"status": "refreshed", "qr_url": result.QRURL})
 			sendEvent("status", string(j))
 		case "confirmed":
-			bot, err := s.DB.CreateBot(entry.UserID, "", "ilink", result.Credentials)
-			if err != nil {
-				slog.Error("save bot failed", "err", err)
-				sendEvent("error", `{"message":"save failed"}`)
-				return
+			// Extract iLink bot_id from credentials to check for existing bot
+			var creds struct {
+				BotID string `json:"bot_id"`
+			}
+			json.Unmarshal(result.Credentials, &creds)
+
+			var bot *database.Bot
+			if creds.BotID != "" {
+				existing, _ := s.DB.FindBotByCredential("bot_id", creds.BotID)
+				if existing != nil {
+					if existing.UserID != entry.UserID {
+						sendEvent("error", `{"message":"this account is already bound by another user"}`)
+						return
+					}
+					// Same user rebinding: update credentials and restart
+					s.BotManager.StopBot(existing.ID)
+					if err := s.DB.UpdateBotCredentials(existing.ID, result.Credentials); err != nil {
+						slog.Error("rebind update failed", "err", err)
+						sendEvent("error", `{"message":"rebind failed"}`)
+						return
+					}
+					existing.Credentials = result.Credentials
+					existing.Status = "connected"
+					bot = existing
+				}
 			}
 
-			// Auto-create default channel
-			var aiCfg *database.AIConfig
-			if r.URL.Query().Get("enable_ai") == "true" {
-				aiCfg = &database.AIConfig{Enabled: true, Source: "builtin"}
+			if bot == nil {
+				var err error
+				bot, err = s.DB.CreateBot(entry.UserID, "", "ilink", result.Credentials)
+				if err != nil {
+					slog.Error("save bot failed", "err", err)
+					sendEvent("error", `{"message":"save failed"}`)
+					return
+				}
+				// Auto-create default channel for new bots only
+				var aiCfg *database.AIConfig
+				if r.URL.Query().Get("enable_ai") == "true" {
+					aiCfg = &database.AIConfig{Enabled: true, Source: "builtin"}
+				}
+				s.DB.CreateChannel(bot.ID, "默认", "", nil, aiCfg)
 			}
-			s.DB.CreateChannel(bot.ID, "默认", "", nil, aiCfg)
 
 			s.BotManager.StartBot(context.Background(), bot)
 
@@ -245,7 +274,11 @@ func (s *Server) handleBotSend(w http.ResponseWriter, r *http.Request) {
 
 	inst, ok := s.BotManager.GetInstance(botID)
 	if !ok {
-		jsonError(w, "bot not connected", http.StatusServiceUnavailable)
+		if bot.Status == "session_expired" {
+			jsonError(w, "session expired", http.StatusConflict)
+		} else {
+			jsonError(w, "bot not connected", http.StatusServiceUnavailable)
+		}
 		return
 	}
 
