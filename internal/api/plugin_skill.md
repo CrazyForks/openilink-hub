@@ -81,11 +81,10 @@ If a script modifies `ctx.req.url` to a domain not in the whitelist, execution i
 Declares which APIs the plugin needs. If `@grant` is not specified, all APIs are available (backward compatible). If specified, only declared APIs work.
 
 ```
-// @grant  none              no side effects (reply/skip/forward all blocked)
-// @grant  reply             can call reply()
-// @grant  forward           can call forward()
-// @grant  skip              can call skip()
-// @grant  reply,forward     can reply text and forward binary
+// @grant  none          no side effects (reply/skip blocked)
+// @grant  reply         can call reply() (text, forward, base64)
+// @grant  skip          can call skip()
+// @grant  reply,skip    can call both
 ```
 
 ### @config Syntax
@@ -151,11 +150,34 @@ Use `ctx.res.content_type` to detect the type and call `forward()` to send it to
 
 | Function | Description |
 |---|---|
-| `reply(text)` | Send a text message back to the sender via the bot (max 10 per execution) |
-| `forward()` | Forward the binary HTTP response as a media message to the sender (image, audio, video, file) |
+| `reply("text")` | Send a text message to the sender (max 10 per execution) |
+| `reply("data:image/png;base64,...")` | Decode data URI and send as media |
+| `reply({forward: true})` | Forward the binary HTTP response as media (image, file, etc.) |
+| `reply({base64: "...", filename: "img.png"})` | Decode base64 and send as media (filename optional) |
 | `skip()` | Cancel this webhook delivery (no HTTP request will be made) |
 | `JSON.parse(str)` | Parse JSON string |
 | `JSON.stringify(obj)` | Serialize to JSON string |
+
+### reply() details
+
+`reply()` is the unified function for all responses. It detects the argument type:
+
+```javascript
+// Text reply
+reply("Hello!");
+
+// Forward binary HTTP response (when ctx.res.body is null)
+reply({forward: true});
+
+// Data URI — auto-detects MIME, sends as media
+reply("data:image/png;base64,iVBORw0KGgo...");
+
+// Raw base64 with optional filename
+reply({base64: "iVBORw0KGgo...", filename: "chart.png"});
+
+// Raw base64 without filename — sent as file.bin
+reply({base64: "iVBORw0KGgo..."});
+```
 
 ## Sandbox Restrictions
 
@@ -283,7 +305,7 @@ Sends a request to an API that returns binary (image/file), then forwards the re
 // @icon         🎨
 // @match        text
 // @connect      api.example.com
-// @grant        forward,reply
+// @grant        reply
 // ==/WebhookPlugin==
 
 function onRequest(ctx) {
@@ -293,7 +315,7 @@ function onRequest(ctx) {
 
 function onResponse(ctx) {
   if (ctx.res.content_type && ctx.res.content_type.indexOf("image/") === 0) {
-    forward(); // send image to user
+    reply({forward: true}); // send image to user
     reply("Image generated (" + ctx.res.size + " bytes)");
   } else if (ctx.res.body) {
     var data = JSON.parse(ctx.res.body);
@@ -405,9 +427,8 @@ When generating a plugin:
 2. Use `JSON.stringify()` to set `ctx.req.body` — it must be a string
 3. Use `JSON.parse()` to read `ctx.res.body` in onResponse (check for null first — binary responses have body=null)
 4. Call `skip()` to conditionally cancel delivery
-5. Call `reply(text)` to send a text message back through the bot
-6. Call `forward()` to forward binary HTTP responses (images, files) to the user — check `ctx.res.content_type` first
+5. Call `reply("text")` for text, `reply({forward: true})` for binary response, `reply("data:...")` for data URIs
 7. Don't use ES6+ syntax (no arrow functions, no const/let, no template literals) — the runtime is ES5
 8. Don't try to access external resources — the sandbox blocks all I/O
 9. Keep the script simple and focused — complex logic should live in the webhook receiver
-10. Declare `@grant forward` if the plugin needs to forward binary responses
+10. Declare `@grant reply` — covers text, forward, and base64 media

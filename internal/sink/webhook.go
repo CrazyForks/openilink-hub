@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"encoding/base64"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -297,7 +298,7 @@ func (s *Webhook) Handle(d Delivery) {
 	applyAuth(req, cfg.Auth, body)
 
 	var res *resData
-	var replies []string
+	var replies []replyAction
 	skipped := false
 
 	// Resolve script
@@ -313,28 +314,27 @@ func (s *Webhook) Handle(d Delivery) {
 			pluginVersion = plugin.Version
 		}
 	}
-	// Update log with resolved version
 	if pluginVersion != "" {
 		s.DB.Exec("UPDATE webhook_logs SET plugin_version = $1 WHERE id = $2", pluginVersion, logID)
 	}
 
-	// Step 1: Run script (onRequest + HTTP + onResponse)
-	var forwarded bool
+	// Step 1: Run script
 	if script != "" {
 		var err error
-		req, res, replies, skipped, forwarded, err = s.runScript(script, msg, req, d.Channel.ID)
+		req, res, replies, skipped, err = s.runScript(script, msg, req, d.Channel.ID)
 		if err != nil {
 			slog.Error("webhook script error", "channel", d.Channel.ID, "err", err)
 			s.DB.UpdateWebhookLogResult(logID, "error", err.Error(), nil)
 			return
 		}
 		if skipped || req == nil {
-			s.DB.UpdateWebhookLogResult(logID, "skipped", "", replies)
+			replyTexts := extractReplyTexts(replies)
+			s.DB.UpdateWebhookLogResult(logID, "skipped", "", replyTexts)
 			return
 		}
 	}
 
-	// Step 2: Log request details
+	// Step 2: Log request
 	s.DB.UpdateWebhookLogRequest(logID, "requesting", req.URL, req.Method, truncate(req.Body, 4096))
 
 	// Step 3: Send HTTP
@@ -359,21 +359,18 @@ func (s *Webhook) Handle(d Delivery) {
 	if res != nil && len(replies) == 0 {
 		var body struct{ Reply string }
 		if json.Unmarshal([]byte(res.Body), &body) == nil && body.Reply != "" {
-			replies = append(replies, body.Reply)
+			replies = append(replies, replyAction{Text: body.Reply})
 		}
 	}
 
-	// Step 5: Log final result with replies
-	if len(replies) > 0 {
-		s.DB.UpdateWebhookLogResult(logID, "success", "", replies)
+	// Step 5: Log
+	replyTexts := extractReplyTexts(replies)
+	if len(replyTexts) > 0 {
+		s.DB.UpdateWebhookLogResult(logID, "success", "", replyTexts)
 	}
 
-	// Step 6: Forward binary response as media if requested
-	if forwarded && res != nil && res.RawBody != nil {
-		go s.forwardMedia(d, res)
-	}
-
-	s.sendReplies(d, replies)
+	// Step 6: Process all replies
+	s.processReplies(d, res, replies)
 }
 
 // contentTypeToFileInfo maps Content-Type to (filename, itemType).
@@ -547,15 +544,23 @@ func parseScriptPerms(script string) (grants map[string]bool, matchTypes map[str
 	return
 }
 
+// replyAction represents a single reply from a script.
+type replyAction struct {
+	Text     string // text reply
+	Forward  bool   // forward binary response
+	Base64   string // base64-encoded data
+	Filename string // optional filename for base64
+}
+
 func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, channelID string) (
-	outReq *reqData, outRes *resData, replies []string, skipped bool, forwarded bool, err error,
+	outReq *reqData, outRes *resData, replies []replyAction, skipped bool, err error,
 ) {
 	// Parse permissions from script metadata
 	grants, matchTypes, connectDomains := parseScriptPerms(script)
 
 	// @match enforcement: skip if message type doesn't match
 	if !matchTypes["*"] && !matchTypes[msg.MsgType] {
-		return req, nil, nil, false, false, nil
+		return req, nil, nil, false, nil
 	}
 
 	vm := goja.New()
@@ -579,21 +584,51 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 	}
 	vm.Set("ctx", ctx)
 
-	// @grant enforcement: only expose granted APIs
-	if grants["reply"] || grants["none"] == false && len(grants) == 0 {
-		// grant reply or no @grant declared (backward compat: all allowed)
-		vm.Set("reply", func(text string) {
-			if len(replies) < scriptMaxReplies {
-				replies = append(replies, text)
+	// reply(arg) — unified reply function
+	// - reply("text") → text reply
+	// - reply("data:image/png;base64,...") → decode data URI and send as media
+	// - reply({forward: true}) → forward binary HTTP response
+	// - reply({base64: "...", filename: "img.png"}) → decode and send
+	canReply := grants["reply"] || (len(grants) == 0 && !grants["none"])
+	if canReply {
+		vm.Set("reply", func(call goja.FunctionCall) goja.Value {
+			if len(replies) >= scriptMaxReplies {
+				return goja.Undefined()
 			}
+			arg := call.Argument(0)
+			if arg == nil || goja.IsUndefined(arg) || goja.IsNull(arg) {
+				return goja.Undefined()
+			}
+
+			// String argument
+			if s, ok := arg.Export().(string); ok {
+				if strings.HasPrefix(s, "data:") {
+					// data URI — extract mime and base64
+					replies = append(replies, replyAction{Base64: s})
+				} else {
+					replies = append(replies, replyAction{Text: s})
+				}
+				return goja.Undefined()
+			}
+
+			// Object argument
+			if obj, ok := arg.Export().(map[string]any); ok {
+				if fwd, _ := obj["forward"].(bool); fwd {
+					replies = append(replies, replyAction{Forward: true})
+				} else if b64, _ := obj["base64"].(string); b64 != "" {
+					fn, _ := obj["filename"].(string)
+					replies = append(replies, replyAction{Base64: b64, Filename: fn})
+				}
+			}
+			return goja.Undefined()
 		})
 	} else {
-		vm.Set("reply", func(text string) {
+		vm.Set("reply", func(call goja.FunctionCall) goja.Value {
 			panic(vm.NewGoError(fmt.Errorf("reply() not granted — add @grant reply")))
 		})
 	}
 
-	if grants["skip"] || grants["none"] == false && len(grants) == 0 {
+	if grants["skip"] || (len(grants) == 0 && !grants["none"]) {
 		vm.Set("skip", func() { skipped = true })
 	} else {
 		vm.Set("skip", func() {
@@ -601,27 +636,12 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 		})
 	}
 
-	// If @grant none, block both
 	if grants["none"] {
-		vm.Set("reply", func(text string) {
+		vm.Set("reply", func(call goja.FunctionCall) goja.Value {
 			panic(vm.NewGoError(fmt.Errorf("reply() blocked by @grant none")))
 		})
 		vm.Set("skip", func() {
 			panic(vm.NewGoError(fmt.Errorf("skip() blocked by @grant none")))
-		})
-	}
-
-	// forward() — forward binary response as media to user
-	if grants["forward"] || (len(grants) == 0 && !grants["none"]) {
-		vm.Set("forward", func() { forwarded = true })
-	} else {
-		vm.Set("forward", func() {
-			panic(vm.NewGoError(fmt.Errorf("forward() not granted — add @grant forward")))
-		})
-	}
-	if grants["none"] {
-		vm.Set("forward", func() {
-			panic(vm.NewGoError(fmt.Errorf("forward() blocked by @grant none")))
 		})
 	}
 
@@ -635,20 +655,20 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 	timer.Stop()
 	vm.ClearInterrupt()
 	if err != nil {
-		return nil, nil, nil, false, false, err
+		return nil, nil, nil, false, err
 	}
 
 	// Phase 1: onRequest
 	if fn := vm.Get("onRequest"); fn != nil && !goja.IsUndefined(fn) {
 		if callable, ok := goja.AssertFunction(fn); ok {
 			if _, err := runScriptWithTimeout(vm, callable, vm.Get("ctx")); err != nil {
-				return nil, nil, nil, false, false, err
+				return nil, nil, nil, false, err
 			}
 		}
 	}
 
 	if skipped {
-		return nil, nil, replies, true, false, nil
+		return nil, nil, replies, true, nil
 	}
 
 	// Extract modified req from ctx
@@ -657,7 +677,7 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 	// @connect enforcement: validate URL domain
 	if !connectDomains["*"] && outReq.URL != req.URL {
 		if !isDomainAllowed(outReq.URL, connectDomains) {
-			return nil, nil, nil, false, false, fmt.Errorf("URL domain not in @connect whitelist: %s", outReq.URL)
+			return nil, nil, nil, false, fmt.Errorf("URL domain not in @connect whitelist: %s", outReq.URL)
 		}
 	}
 
@@ -688,30 +708,95 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 		}
 	}
 
-	return outReq, outRes, replies, false, forwarded, nil
+	return outReq, outRes, replies, false, nil
 }
 
-func (s *Webhook) sendReplies(d Delivery, replies []string) {
-	for _, text := range replies {
-		if text == "" {
-			continue
+func extractReplyTexts(replies []replyAction) []string {
+	var texts []string
+	for _, r := range replies {
+		if r.Text != "" {
+			texts = append(texts, r.Text)
+		} else if r.Forward {
+			texts = append(texts, "[forward]")
+		} else if r.Base64 != "" {
+			texts = append(texts, "[base64]")
 		}
-		_, err := d.Provider.Send(context.Background(), provider.OutboundMessage{
-			Recipient: d.Message.Sender,
-			Text:      text,
-		})
-		if err != nil {
-			slog.Error("webhook reply failed", "channel", d.Channel.ID, "err", err)
-			continue
+	}
+	return texts
+}
+
+// parseDataURI parses "data:image/png;base64,iVBOR..." into mime and raw bytes.
+func parseDataURI(uri string) (mime string, data []byte, err error) {
+	if !strings.HasPrefix(uri, "data:") {
+		// Plain base64 without data URI prefix
+		data, err = base64.StdEncoding.DecodeString(uri)
+		return "", data, err
+	}
+	// data:image/png;base64,iVBOR...
+	parts := strings.SplitN(uri[5:], ",", 2)
+	if len(parts) != 2 {
+		return "", nil, fmt.Errorf("invalid data URI")
+	}
+	meta := parts[0] // "image/png;base64"
+	mime = strings.Split(meta, ";")[0]
+	data, err = base64.StdEncoding.DecodeString(parts[1])
+	return mime, data, err
+}
+
+func (s *Webhook) processReplies(d Delivery, res *resData, replies []replyAction) {
+	for _, r := range replies {
+		switch {
+		case r.Text != "":
+			// Text reply
+			_, err := d.Provider.Send(context.Background(), provider.OutboundMessage{
+				Recipient: d.Message.Sender, Text: r.Text,
+			})
+			if err != nil {
+				slog.Error("webhook reply failed", "channel", d.Channel.ID, "err", err)
+				continue
+			}
+			itemList, _ := json.Marshal([]map[string]any{{"type": "text", "text": r.Text}})
+			s.DB.SaveMessage(&database.Message{
+				BotID: d.BotDBID, Direction: "outbound", ToUserID: d.Message.Sender, MessageType: 2, ItemList: itemList,
+			})
+
+		case r.Forward:
+			// Forward binary response
+			if res != nil && res.RawBody != nil {
+				s.forwardMedia(d, res)
+			}
+
+		case r.Base64 != "":
+			// Decode base64/data URI and send as media
+			mime, data, err := parseDataURI(r.Base64)
+			if err != nil {
+				slog.Error("webhook base64 decode failed", "channel", d.Channel.ID, "err", err)
+				continue
+			}
+			fileName := r.Filename
+			if fileName == "" {
+				if mime != "" {
+					fileName, _ = contentTypeToFileInfo(mime)
+				} else {
+					fileName = "file.bin"
+				}
+			}
+			_, err = d.Provider.Send(context.Background(), provider.OutboundMessage{
+				Recipient: d.Message.Sender, Data: data, FileName: fileName,
+			})
+			if err != nil {
+				slog.Error("webhook base64 send failed", "channel", d.Channel.ID, "err", err)
+				continue
+			}
+			itemType := "file"
+			if mime != "" {
+				_, itemType = contentTypeToFileInfo(mime)
+			}
+			itemList, _ := json.Marshal([]map[string]any{{"type": itemType, "file_name": fileName}})
+			s.DB.SaveMessage(&database.Message{
+				BotID: d.BotDBID, Direction: "outbound", ToUserID: d.Message.Sender, MessageType: 2, ItemList: itemList,
+			})
 		}
-		itemList, _ := json.Marshal([]map[string]any{{"type": "text", "text": text}})
-		s.DB.SaveMessage(&database.Message{
-			BotID:       d.BotDBID,
-			Direction:   "outbound",
-			ToUserID:    d.Message.Sender,
-			MessageType: 2,
-			ItemList:    itemList,
-		})
 	}
 }
 
