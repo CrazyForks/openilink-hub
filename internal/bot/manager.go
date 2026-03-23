@@ -296,7 +296,7 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 	matched := m.matchChannels(inst.DBID, msg.Sender, parsed)
 
 	// Phase 3: Deliver to sinks
-	m.deliverToChannels(inst, msg, parsed, matched)
+	m.deliverToChannels(inst, msg, parsed, matched, msgID)
 }
 
 // parsedMessage holds extracted info from an inbound message.
@@ -469,27 +469,21 @@ func (m *Manager) matchChannels(botDBID, sender string, p parsedMessage) []datab
 	return matched
 }
 
-// deliverToChannels saves per-channel copies and fans out to sinks concurrently.
-func (m *Manager) deliverToChannels(inst *Instance, msg provider.InboundMessage, p parsedMessage, matched []database.Channel) {
+// deliverToChannels fans out to matched channels' sinks concurrently.
+// Uses the global msgID as seqID — no per-channel message copies.
+func (m *Manager) deliverToChannels(inst *Instance, msg provider.InboundMessage, p parsedMessage, matched []database.Channel, msgID int64) {
 	if len(matched) == 0 {
 		return
 	}
 
 	var wg sync.WaitGroup
 	for _, ch := range matched {
-		chID := ch.ID
-		dbMsg := m.buildDBMessage(inst.DBID, &chID, msg, p)
-		seqID, err := m.db.SaveMessage(dbMsg)
-		if err != nil {
-			slog.Error("save channel message failed", "bot", inst.DBID, "channel", ch.ID, "err", err)
-			continue
-		}
-		if err := m.db.UpdateChannelLastSeq(ch.ID, seqID); err != nil {
+		if err := m.db.UpdateChannelLastSeq(ch.ID, msgID); err != nil {
 			slog.Error("update channel last_seq failed", "channel", ch.ID, "err", err)
 		}
 
 		env := relay.NewEnvelope("message", relay.MessageData{
-			SeqID: seqID, ExternalID: msg.ExternalID,
+			SeqID: msgID, ExternalID: msg.ExternalID,
 			Sender: msg.Sender, Recipient: msg.Recipient, GroupID: msg.GroupID,
 			Timestamp: msg.Timestamp, MessageState: msg.MessageState,
 			Items: p.relayItems, ContextToken: msg.ContextToken, SessionID: msg.SessionID,
@@ -497,7 +491,7 @@ func (m *Manager) deliverToChannels(inst *Instance, msg provider.InboundMessage,
 
 		d := sink.Delivery{
 			BotDBID: inst.DBID, Provider: inst.Provider, Channel: ch,
-			Message: msg, Envelope: env, SeqID: seqID,
+			Message: msg, Envelope: env, SeqID: msgID,
 			MsgType: p.msgType, Content: p.content,
 		}
 		for _, s := range m.sinks {
