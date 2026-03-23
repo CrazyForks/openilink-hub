@@ -75,11 +75,9 @@ func (s *AI) reply(d Delivery) {
 		return
 	}
 
-	chID := d.Channel.ID
 	itemList, _ := json.Marshal([]map[string]any{{"type": "text", "text": reply}})
 	s.DB.SaveMessage(&database.Message{
 		BotID:       d.BotDBID,
-		ChannelID:   &chID,
 		Direction:   "outbound",
 		ToUserID:    sender,
 		MessageType: 2, // BOT

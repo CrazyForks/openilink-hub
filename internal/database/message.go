@@ -112,24 +112,19 @@ func (db *DB) ListMessagesBySender(botID, sender string, limit int) ([]Message, 
 	)
 }
 
-// ListChannelMessages returns messages relevant to a channel + sender.
-// Inbound messages are stored globally (channel_id IS NULL), matched by bot_id + sender.
-// Outbound messages are stored with channel_id, matched directly.
+// ListChannelMessages returns messages for a channel's bot + sender.
+// All messages (inbound + outbound) are stored globally with channel_id IS NULL.
 func (db *DB) ListChannelMessages(channelID, sender string, limit int) ([]Message, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	// Get bot_id from channel
 	var botID string
 	if err := db.QueryRow("SELECT bot_id FROM channels WHERE id = $1", channelID).Scan(&botID); err != nil {
 		return nil, err
 	}
 	return scanMessages(db,
-		"SELECT "+msgSelectCols+` FROM messages WHERE
-			((bot_id = $1 AND channel_id IS NULL AND from_user_id = $2) OR
-			 (channel_id = $3 AND to_user_id = $2))
-			ORDER BY id DESC LIMIT $4`,
-		botID, sender, channelID, limit,
+		"SELECT "+msgSelectCols+" FROM messages WHERE bot_id = $1 AND (from_user_id = $2 OR to_user_id = $2) ORDER BY id DESC LIMIT $3",
+		botID, sender, limit,
 	)
 }
 

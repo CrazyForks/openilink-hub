@@ -156,10 +156,8 @@ func (s *Server) handleChannelSend(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	chID := ch.ID
 	s.DB.SaveMessage(&database.Message{
 		BotID:       ch.BotID,
-		ChannelID:   &chID,
 		Direction:   "outbound",
 		ToUserID:    msg.Recipient,
 		MessageType: 2,

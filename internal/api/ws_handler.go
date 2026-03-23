@@ -119,11 +119,9 @@ func (s *Server) SetupUpstreamHandler() relay.UpstreamHandler {
 				return
 			}
 
-			channelID := conn.ChannelID
 			itemList, _ := json.Marshal([]map[string]any{{"type": "text", "text": data.Text}})
 			s.DB.SaveMessage(&database.Message{
 				BotID:       conn.BotID,
-				ChannelID:   &channelID,
 				Direction:   "outbound",
 				ToUserID:    data.Recipient,
 				MessageType: 2,

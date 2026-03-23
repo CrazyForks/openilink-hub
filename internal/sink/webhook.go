@@ -315,11 +315,9 @@ func (s *Webhook) sendReplies(d Delivery, replies []string) {
 			slog.Error("webhook reply failed", "channel", d.Channel.ID, "err", err)
 			continue
 		}
-		chID := d.Channel.ID
 		itemList, _ := json.Marshal([]map[string]any{{"type": "text", "text": text}})
 		s.DB.SaveMessage(&database.Message{
 			BotID:       d.BotDBID,
-			ChannelID:   &chID,
 			Direction:   "outbound",
 			ToUserID:    d.Message.Sender,
 			MessageType: 2,

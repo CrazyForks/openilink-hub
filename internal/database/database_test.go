@@ -164,11 +164,10 @@ func TestMessageCRUD(t *testing.T) {
 			MessageType: 1, ItemList: itemList,
 		})
 	}
-	chID := "ch-123"
 	replyItems, _ := json.Marshal([]map[string]any{{"type": "text", "text": "reply"}})
 	db.SaveMessage(&Message{
 		BotID: bot.ID, Direction: "outbound", ToUserID: "user@im.wechat",
-		MessageType: 2, ItemList: replyItems, ChannelID: &chID,
+		MessageType: 2, ItemList: replyItems,
 	})
 
 	msgs, err := db.ListMessages(bot.ID, 10, 0)

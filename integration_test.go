@@ -1498,41 +1498,26 @@ func TestChannelContextFullIsolation(t *testing.T) {
 	})
 	readWSTimeout(t, ws2, 2*time.Second)
 
-	// Add outbound in each channel
-	ch1ID := ch1.ID
-	ch2ID := ch2.ID
+	// Add outbound (stored globally, no channel_id)
 	r1Items, _ := json.Marshal([]map[string]any{{"type": "text", "text": "support reply"}})
 	env.db.SaveMessage(&database.Message{
-		BotID: botObj.ID, ChannelID: &ch1ID, Direction: "outbound",
+		BotID: botObj.ID, Direction: "outbound",
 		ToUserID: "u@wx", MessageType: 2, ItemList: r1Items,
 	})
 	r2Items, _ := json.Marshal([]map[string]any{{"type": "text", "text": "sales reply"}})
 	env.db.SaveMessage(&database.Message{
-		BotID: botObj.ID, ChannelID: &ch2ID, Direction: "outbound",
+		BotID: botObj.ID, Direction: "outbound",
 		ToUserID: "u@wx", MessageType: 2, ItemList: r2Items,
 	})
 
-	// ch1 context: 2 inbound (all from same bot+sender) + 1 outbound ("support reply") = 3
+	// All messages shared at bot level: 2 inbound + 2 outbound = 4
 	msgs1, _ := env.db.ListChannelMessages(ch1.ID, "u@wx", 50)
-	if len(msgs1) != 3 {
-		t.Errorf("ch1: want 3, got %d", len(msgs1))
+	if len(msgs1) != 4 {
+		t.Errorf("ch1: want 4, got %d", len(msgs1))
 	}
-	// ch1 outbound should NOT contain ch2 outbound
-	for _, m := range msgs1 {
-		if m.Direction == "outbound" && strings.Contains(string(m.ItemList), "sales reply") {
-			t.Error("ch1 leaked ch2 outbound")
-		}
-	}
-
-	// ch2 context: 2 inbound (same) + 1 outbound ("sales reply") = 3
 	msgs2, _ := env.db.ListChannelMessages(ch2.ID, "u@wx", 50)
-	if len(msgs2) != 3 {
-		t.Errorf("ch2: want 3, got %d", len(msgs2))
-	}
-	for _, m := range msgs2 {
-		if m.Direction == "outbound" && strings.Contains(string(m.ItemList), "support reply") {
-			t.Error("ch2 leaked ch1 outbound")
-		}
+	if len(msgs2) != 4 {
+		t.Errorf("ch2: want 4, got %d", len(msgs2))
 	}
 }
 
@@ -1662,16 +1647,16 @@ func TestChannelHTTPSend(t *testing.T) {
 		t.Errorf("sent = %+v", sent)
 	}
 
-	// Verify message saved in DB with channel_id
+	// Verify message saved in DB (globally, no channel_id)
 	dbMsgs, _ := env.db.ListMessages(botObj.ID, 10, 0)
 	found := false
 	for _, m := range dbMsgs {
-		if m.Direction == "outbound" && m.ChannelID != nil && *m.ChannelID == ch.ID {
+		if m.Direction == "outbound" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("outbound message not saved with channel_id")
+		t.Error("outbound message not saved")
 	}
 
 	// Send without text
@@ -2056,8 +2041,6 @@ func TestAIContextIsolation(t *testing.T) {
 	ch2, _ := env.db.CreateChannel(botObj.ID, "Sales", "sales", nil, nil)
 
 	sender := "user@wechat"
-	ch1ID := ch1.ID
-	ch2ID := ch2.ID
 
 	// Inbound stored globally (no channel_id)
 	items1, _ := json.Marshal([]map[string]any{{"type": "text", "text": "help me"}})
@@ -2071,45 +2054,32 @@ func TestAIContextIsolation(t *testing.T) {
 		FromUserID: sender, MessageType: 1, ItemList: items2,
 	})
 
-	// Outbound replies are per-channel
+	// Outbound replies (stored globally, no channel_id)
 	reply1, _ := json.Marshal([]map[string]any{{"type": "text", "text": "support reply"}})
 	env.db.SaveMessage(&database.Message{
-		BotID: botObj.ID, ChannelID: &ch1ID, Direction: "outbound",
+		BotID: botObj.ID, Direction: "outbound",
 		ToUserID: sender, MessageType: 2, ItemList: reply1,
 	})
 	reply2, _ := json.Marshal([]map[string]any{{"type": "text", "text": "sales reply"}})
 	env.db.SaveMessage(&database.Message{
-		BotID: botObj.ID, ChannelID: &ch2ID, Direction: "outbound",
+		BotID: botObj.ID, Direction: "outbound",
 		ToUserID: sender, MessageType: 2, ItemList: reply2,
 	})
 
-	// ch1: 2 inbound (global, shared) + 1 outbound (ch1 only) = 3
+	// All messages shared at bot level: 2 inbound + 2 outbound = 4
 	msgs1, err := env.db.ListChannelMessages(ch1.ID, sender, 50)
 	if err != nil {
 		t.Fatalf("ch1: %v", err)
 	}
-	if len(msgs1) != 3 {
-		t.Errorf("ch1: want 3, got %d", len(msgs1))
+	if len(msgs1) != 4 {
+		t.Errorf("ch1: want 4, got %d", len(msgs1))
 	}
-	// ch1 outbound should NOT leak ch2 outbound
-	for _, m := range msgs1 {
-		if m.Direction == "outbound" && strings.Contains(string(m.ItemList), "sales reply") {
-			t.Errorf("ch1 leaked ch2 outbound")
-		}
-	}
-
-	// ch2: 2 inbound (global, shared) + 1 outbound (ch2 only) = 3
 	msgs2, err := env.db.ListChannelMessages(ch2.ID, sender, 50)
 	if err != nil {
 		t.Fatalf("ch2: %v", err)
 	}
-	if len(msgs2) != 3 {
-		t.Errorf("ch2: want 3, got %d", len(msgs2))
-	}
-	for _, m := range msgs2 {
-		if m.Direction == "outbound" && strings.Contains(string(m.ItemList), "support reply") {
-			t.Errorf("ch2 leaked ch1 outbound")
-		}
+	if len(msgs2) != 4 {
+		t.Errorf("ch2: want 4, got %d", len(msgs2))
 	}
 
 	// Other sender: 0
