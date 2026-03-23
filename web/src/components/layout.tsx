@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LogOut, Settings, Github } from "lucide-react";
+import { LogOut, Settings, Github, Puzzle } from "lucide-react";
 import { api } from "../lib/api";
 
 export function Layout() {
@@ -29,7 +29,10 @@ export function Layout() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">{user.username}</span>
-          <Link to="/settings" className="text-muted-foreground hover:text-foreground">
+          <Link to="/plugins" className="text-muted-foreground hover:text-foreground" title="插件市场">
+            <Puzzle className="w-4 h-4" />
+          </Link>
+          <Link to="/settings" className="text-muted-foreground hover:text-foreground" title="设置">
             <Settings className="w-4 h-4" />
           </Link>
           <button onClick={handleLogout} className="text-muted-foreground hover:text-foreground cursor-pointer">

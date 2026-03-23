@@ -49,7 +49,7 @@ func testDB(t *testing.T) *database.DB {
 	if err != nil {
 		t.Skipf("skip: database unavailable: %v", err)
 	}
-	for _, table := range []string{"messages", "channels", "bots", "oauth_accounts", "sessions", "credentials", "users", "system_config"} {
+	for _, table := range []string{"plugins", "messages", "channels", "bots", "oauth_accounts", "sessions", "credentials", "users", "system_config"} {
 		db.Exec("DELETE FROM " + table)
 	}
 	return db
