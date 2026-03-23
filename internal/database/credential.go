@@ -12,7 +12,9 @@ type Credential struct {
 
 func (db *DB) SaveCredential(c *Credential) error {
 	_, err := db.Exec(
-		"INSERT INTO credentials (id, user_id, public_key, attestation_type, transport, sign_count) VALUES ($1, $2, $3, $4, $5, $6)",
+		`INSERT INTO credentials (id, user_id, public_key, attestation_type, transport, sign_count)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 ON CONFLICT (id) DO UPDATE SET user_id = $2, public_key = $3, attestation_type = $4, transport = $5, sign_count = $6, created_at = NOW()`,
 		c.ID, c.UserID, c.PublicKey, c.AttestationType, c.Transport, c.SignCount,
 	)
 	return err
