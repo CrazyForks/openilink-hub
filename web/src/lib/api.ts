@@ -76,13 +76,13 @@ export const api = {
   deleteAIConfig: () => request("/api/admin/config/ai", { method: "DELETE" }),
 
   // Plugins
-  listPlugins: (status?: string) => request<any[]>(`/api/plugins${status ? `?status=${status}` : ""}`),
-  getPlugin: (id: string) => request<any>(`/api/plugins/${id}`),
-  submitPlugin: (github_url: string) => request<any>("/api/plugins/submit", { method: "POST", body: JSON.stringify({ github_url }) }),
-  installPlugin: (id: string) => request<any>(`/api/plugins/${id}/install`, { method: "POST" }),
+  listPlugins: (status?: string) => request<any[]>(`/api/webhook-plugins${status ? `?status=${status}` : ""}`),
+  getPlugin: (id: string) => request<any>(`/api/webhook-plugins/${id}`),
+  submitPlugin: (github_url: string) => request<any>("/api/webhook-plugins/submit", { method: "POST", body: JSON.stringify({ github_url }) }),
+  installPlugin: (id: string) => request<any>(`/api/webhook-plugins/${id}/install`, { method: "POST" }),
   reviewPlugin: (id: string, status: string, reason?: string) =>
-    request(`/api/admin/plugins/${id}/review`, { method: "PUT", body: JSON.stringify({ status, reason: reason || "" }) }),
-  deletePlugin: (id: string) => request(`/api/admin/plugins/${id}`, { method: "DELETE" }),
+    request(`/api/admin/webhook-plugins/${id}/review`, { method: "PUT", body: JSON.stringify({ status, reason: reason || "" }) }),
+  deletePlugin: (id: string) => request(`/api/admin/webhook-plugins/${id}`, { method: "DELETE" }),
 
   // Admin: Dashboard
   adminStats: () => request<any>("/api/admin/stats"),

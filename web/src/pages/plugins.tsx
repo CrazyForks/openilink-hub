@@ -30,7 +30,7 @@ export function PluginsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">插件市场</h2>
+        <h2 className="text-lg font-semibold">Webhook 插件市场</h2>
         <div className="flex border rounded-lg overflow-hidden">
           <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "marketplace" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("marketplace")}>市场</button>
           <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "submit" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("submit")}>提交</button>

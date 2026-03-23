@@ -29,7 +29,7 @@ export function Layout() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">{user.username}</span>
-          <Link to="/plugins" className="text-muted-foreground hover:text-foreground" title="插件市场">
+          <Link to="/webhook-plugins" className="text-muted-foreground hover:text-foreground" title="插件市场">
             <Puzzle className="w-4 h-4" />
           </Link>
           <Link to="/settings" className="text-muted-foreground hover:text-foreground" title="设置">

@@ -14,37 +14,47 @@ import (
 	"github.com/openilink/openilink-hub/internal/database"
 )
 
-// POST /api/plugins/submit
+// POST /api/webhook-plugins/submit
 // Body: {"github_url": "https://github.com/user/repo/blob/main/plugin.js"}
+// Alt:  {"script": "// @name ...\nfunction onRequest(ctx) {...}"} (inline, no GitHub)
 func (s *Server) handleSubmitPlugin(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
 	var req struct {
 		GithubURL string `json:"github_url"`
+		Script    string `json:"script"` // inline submission (alternative to github_url)
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.GithubURL == "" {
-		jsonError(w, "github_url required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	// Parse GitHub URL → raw content URL + fetch commit hash
-	rawURL, owner, repo, path, err := parseGithubBlobURL(req.GithubURL)
-	if err != nil {
-		jsonError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	var script, githubURL, commitHash string
 
-	// Fetch script content
-	script, err := fetchURL(rawURL)
-	if err != nil {
-		jsonError(w, "failed to fetch script: "+err.Error(), http.StatusBadGateway)
+	if req.Script != "" {
+		// Inline submission
+		script = req.Script
+	} else if req.GithubURL != "" {
+		// GitHub fetch
+		rawURL, owner, repo, path, err := parseGithubBlobURL(req.GithubURL)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var fetchErr error
+		script, fetchErr = fetchURL(rawURL)
+		if fetchErr != nil {
+			jsonError(w, "failed to fetch script: "+fetchErr.Error(), http.StatusBadGateway)
+			return
+		}
+		githubURL = req.GithubURL
+		commitHash, err = fetchGithubCommitHash(owner, repo, path)
+		if err != nil {
+			slog.Warn("failed to fetch commit hash, using empty", "err", err)
+		}
+	} else {
+		jsonError(w, "github_url or script required", http.StatusBadRequest)
 		return
-	}
-
-	// Fetch latest commit hash for this file
-	commitHash, err := fetchGithubCommitHash(owner, repo, path)
-	if err != nil {
-		slog.Warn("failed to fetch commit hash, using empty", "err", err)
 	}
 
 	// Parse plugin metadata from script comments
@@ -61,7 +71,7 @@ func (s *Server) handleSubmitPlugin(w http.ResponseWriter, r *http.Request) {
 		Description:  meta.Description,
 		Author:       meta.Author,
 		Version:      meta.Version,
-		GithubURL:    req.GithubURL,
+		GithubURL:    githubURL,
 		CommitHash:   commitHash,
 		Script:       script,
 		ConfigSchema: configSchema,
@@ -92,6 +102,7 @@ func (s *Server) handleListPlugins(w http.ResponseWriter, r *http.Request) {
 
 	plugins, err := s.DB.ListPlugins(status)
 	if err != nil {
+		slog.Error("list plugins failed", "status", status, "err", err)
 		jsonError(w, "list failed", http.StatusInternalServerError)
 		return
 	}

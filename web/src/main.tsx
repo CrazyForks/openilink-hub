@@ -17,7 +17,7 @@ createRoot(document.getElementById("root")!).render(
         <Route element={<Layout />}>
           <Route path="/" element={<BotsPage />} />
           <Route path="/bot/:id" element={<BotDetailPage />} />
-          <Route path="/plugins" element={<PluginsPage />} />
+          <Route path="/webhook-plugins" element={<PluginsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
