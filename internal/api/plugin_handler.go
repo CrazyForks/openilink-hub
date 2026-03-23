@@ -98,27 +98,8 @@ func (s *Server) handleSubmitPlugin(w http.ResponseWriter, r *http.Request) {
 
 	configSchema, _ := json.Marshal(meta.Config)
 
-	// Check for existing pending version → update it
-	existing, err := s.DB.FindPendingVersion(plugin.ID)
-	if err == nil && existing.ID != "" {
-		existing.Version = meta.Version
-		existing.Changelog = meta.Changelog
-		existing.Script = script
-		existing.ConfigSchema = configSchema
-		existing.GithubURL = githubURL
-		existing.CommitHash = commitHash
-		existing.MatchTypes = meta.Match
-		existing.ConnectDomains = meta.Connect
-		existing.GrantPerms = strings.Join(meta.Grant, ",")
-		existing.TimeoutSec = meta.TimeoutSec
-		if err := s.DB.UpdatePluginVersion(existing.ID, existing); err != nil {
-			jsonError(w, "update version failed", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"plugin_id": plugin.ID, "version_id": existing.ID, "status": "pending"})
-		return
-	}
+	// Cancel all non-approved versions (pending/rejected → superseded)
+	s.DB.SupersedeNonApprovedVersions(plugin.ID)
 
 	// Create new version
 	ver, err := s.DB.CreatePluginVersion(&database.PluginVersion{

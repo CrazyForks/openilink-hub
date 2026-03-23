@@ -257,6 +257,11 @@ func (db *DB) ListPendingVersions() ([]PluginVersion, error) {
 	return versions, rows.Err()
 }
 
+// SupersedeNonApprovedVersions marks all pending/rejected versions as superseded.
+func (db *DB) SupersedeNonApprovedVersions(pluginID string) {
+	db.Exec("UPDATE plugin_versions SET status = 'superseded' WHERE plugin_id = $1 AND status IN ('pending', 'rejected')", pluginID)
+}
+
 func (db *DB) FindPendingVersion(pluginID string) (*PluginVersion, error) {
 	return db.getVersionByPluginAndStatus(pluginID, "pending")
 }

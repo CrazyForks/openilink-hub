@@ -2467,18 +2467,38 @@ func TestWebhookPluginVersionHistory(t *testing.T) {
 	}
 }
 
-func TestWebhookPluginResubmitOverwrites(t *testing.T) {
+func TestWebhookPluginResubmitSupersedesPending(t *testing.T) {
 	env := setup(t)
 	defer env.close()
 
 	env.register("resubuser", "password123")
 
-	_, v1ID := env.submitPlugin("// @name ResubPlugin\n// @version 1.0.0\nfunction onRequest(ctx) {}")
-	_, v2ID := env.submitPlugin("// @name ResubPlugin\n// @version 2.0.0\nfunction onRequest(ctx) {}")
+	pluginID, v1ID := env.submitPlugin("// @name ResubPlugin\n// @version 1.0.0\nfunction onRequest(ctx) {}")
+	pluginID2, v2ID := env.submitPlugin("// @name ResubPlugin\n// @version 2.0.0\nfunction onRequest(ctx) {}")
 
-	// Same version ID (pending overwritten)
-	if v1ID != v2ID {
-		t.Errorf("resubmit should overwrite pending: %s vs %s", v1ID, v2ID)
+	// Same plugin, different version IDs
+	if pluginID != pluginID2 {
+		t.Errorf("should reuse plugin: %s vs %s", pluginID, pluginID2)
+	}
+	if v1ID == v2ID {
+		t.Error("should create new version, not overwrite")
+	}
+
+	// v1 should be superseded, v2 should be pending
+	env.db.Exec("UPDATE users SET role = 'admin' WHERE username = 'resubuser'")
+	code, versions := env.getList("/api/webhook-plugins/" + pluginID + "/versions")
+	assertCode(t, "versions", code, 200)
+	if len(versions) != 2 {
+		t.Fatalf("want 2, got %d", len(versions))
+	}
+	for _, v := range versions {
+		ver := v.(map[string]any)
+		if ver["id"] == v1ID && ver["status"] != "superseded" {
+			t.Errorf("v1 should be superseded, got %v", ver["status"])
+		}
+		if ver["id"] == v2ID && ver["status"] != "pending" {
+			t.Errorf("v2 should be pending, got %v", ver["status"])
+		}
 	}
 }
 
