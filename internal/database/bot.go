@@ -8,27 +8,31 @@ import (
 )
 
 type Bot struct {
-	ID          string          `json:"id"`
-	UserID      string          `json:"user_id"`
-	Name        string          `json:"name"`
-	Provider    string          `json:"provider"`
-	Status      string          `json:"status"`
-	Credentials json.RawMessage `json:"credentials,omitempty"`
-	SyncState   json.RawMessage `json:"-"`
-	MsgCount    int64           `json:"msg_count"`
-	LastMsgAt   *int64          `json:"last_msg_at,omitempty"`
-	CreatedAt   int64           `json:"created_at"`
-	UpdatedAt   int64           `json:"updated_at"`
+	ID             string          `json:"id"`
+	UserID         string          `json:"user_id"`
+	Name           string          `json:"name"`
+	Provider       string          `json:"provider"`
+	Status         string          `json:"status"`
+	Credentials    json.RawMessage `json:"credentials,omitempty"`
+	SyncState      json.RawMessage `json:"-"`
+	MsgCount       int64           `json:"msg_count"`
+	LastMsgAt      *int64          `json:"last_msg_at,omitempty"`
+	ReminderHours  int             `json:"reminder_hours"`
+	LastRemindedAt *int64          `json:"last_reminded_at,omitempty"`
+	CreatedAt      int64           `json:"created_at"`
+	UpdatedAt      int64           `json:"updated_at"`
 }
 
 const botSelectCols = `id, user_id, name, provider, status, credentials, sync_state,
 	msg_count, EXTRACT(EPOCH FROM last_msg_at)::BIGINT,
+	reminder_hours, EXTRACT(EPOCH FROM last_reminded_at)::BIGINT,
 	EXTRACT(EPOCH FROM created_at)::BIGINT, EXTRACT(EPOCH FROM updated_at)::BIGINT`
 
 func scanBot(scanner interface{ Scan(...any) error }) (*Bot, error) {
 	b := &Bot{}
 	err := scanner.Scan(&b.ID, &b.UserID, &b.Name, &b.Provider, &b.Status,
 		&b.Credentials, &b.SyncState, &b.MsgCount, &b.LastMsgAt,
+		&b.ReminderHours, &b.LastRemindedAt,
 		&b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -128,6 +132,42 @@ func (db *DB) UpdateBotSyncState(id string, syncState json.RawMessage) error {
 func (db *DB) IncrBotMsgCount(id string) error {
 	_, err := db.Exec("UPDATE bots SET msg_count = msg_count + 1, last_msg_at = NOW(), updated_at = NOW() WHERE id = $1", id)
 	return err
+}
+
+func (db *DB) UpdateBotReminder(id string, hours int) error {
+	_, err := db.Exec("UPDATE bots SET reminder_hours = $1, updated_at = NOW() WHERE id = $2", hours, id)
+	return err
+}
+
+func (db *DB) MarkBotReminded(id string) error {
+	_, err := db.Exec("UPDATE bots SET last_reminded_at = NOW() WHERE id = $1", id)
+	return err
+}
+
+// GetBotsNeedingReminder returns connected bots where:
+// - reminder_hours > 0
+// - last_msg_at is older than reminder_hours
+// - last_reminded_at is null or older than 1 hour (avoid spam)
+func (db *DB) GetBotsNeedingReminder() ([]Bot, error) {
+	rows, err := db.Query(`SELECT `+botSelectCols+` FROM bots
+		WHERE status = 'connected'
+		AND reminder_hours > 0
+		AND last_msg_at IS NOT NULL
+		AND last_msg_at < NOW() - INTERVAL '1 hour' * reminder_hours
+		AND (last_reminded_at IS NULL OR last_reminded_at < NOW() - INTERVAL '1 hour')`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var bots []Bot
+	for rows.Next() {
+		b, err := scanBot(rows)
+		if err != nil {
+			return nil, err
+		}
+		bots = append(bots, *b)
+	}
+	return bots, rows.Err()
 }
 
 func (db *DB) DeleteBot(id string) error {

@@ -74,6 +74,9 @@ func (m *Manager) StartAll(ctx context.Context) {
 		}
 	}
 	slog.Info("started all bots", "count", len(bots))
+
+	// Start background reminder checker
+	go m.reminderLoop(ctx)
 }
 
 func (m *Manager) StartBot(ctx context.Context, bot *database.Bot) error {
@@ -138,6 +141,53 @@ func (m *Manager) StopAll() {
 		inst.Stop()
 	}
 	m.instances = make(map[string]*Instance)
+}
+
+// reminderLoop periodically checks for bots that need inactivity reminders.
+func (m *Manager) reminderLoop(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.checkReminders()
+		}
+	}
+}
+
+func (m *Manager) checkReminders() {
+	bots, err := m.db.GetBotsNeedingReminder()
+	if err != nil {
+		slog.Error("reminder check failed", "err", err)
+		return
+	}
+	for _, bot := range bots {
+		inst, ok := m.GetInstance(bot.ID)
+		if !ok {
+			continue
+		}
+
+		hours := bot.ReminderHours
+		remaining := 24 - hours
+		text := fmt.Sprintf("[系统提醒] 您的 Bot 已超过 %d 小时未收到消息，距离会话过期还有约 %d 小时。请发送一条消息以保持会话活跃。", hours, remaining)
+
+		token := m.db.GetLatestContextToken(bot.ID)
+		_, err := inst.Send(context.Background(), provider.OutboundMessage{
+			Text:         text,
+			ContextToken: token,
+		})
+		if err != nil {
+			slog.Error("reminder send failed", "bot", bot.ID, "err", err)
+			continue
+		}
+
+		if err := m.db.MarkBotReminded(bot.ID); err != nil {
+			slog.Error("mark reminded failed", "bot", bot.ID, "err", err)
+		}
+		slog.Info("reminder sent", "bot", bot.ID, "hours", hours)
+	}
 }
 
 // RetryMediaDownload retries downloading media for a failed message.

@@ -35,7 +35,7 @@ export const api = {
   bindStart: () => request<{ session_id: string; qr_url: string }>("/api/bots/bind/start", { method: "POST" }),
   reconnectBot: (id: string) => request(`/api/bots/${id}/reconnect`, { method: "POST" }),
   deleteBot: (id: string) => request(`/api/bots/${id}`, { method: "DELETE" }),
-  updateBot: (id: string, data: { name?: string }) =>
+  updateBot: (id: string, data: { name?: string; reminder_hours?: number }) =>
     request(`/api/bots/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   botContacts: (id: string) => request<any[]>(`/api/bots/${id}/contacts`),
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -35,6 +36,15 @@ func testDB(t *testing.T) *database.DB {
 	if dsn == "" {
 		dsn = "postgres://openilink:openilink@localhost:15432/openilink_test?sslmode=disable"
 	}
+	// Pre-connect to reset schema if migrations were consolidated
+	preDB, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Skipf("skip: database unavailable: %v", err)
+	}
+	// Drop schema_version so migrations re-run from scratch after consolidation
+	preDB.Exec("DROP TABLE IF EXISTS schema_version")
+	preDB.Close()
+
 	db, err := database.Open(dsn)
 	if err != nil {
 		t.Skipf("skip: database unavailable: %v", err)

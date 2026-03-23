@@ -26,13 +26,14 @@ func (s *Server) handleListBots(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type botResp struct {
-		ID        string          `json:"id"`
-		Name      string          `json:"name"`
-		Provider  string          `json:"provider"`
-		Status    string          `json:"status"`
-		MsgCount  int64           `json:"msg_count"`
-		CreatedAt int64           `json:"created_at"`
-		Extra     json.RawMessage `json:"extra,omitempty"`
+		ID            string          `json:"id"`
+		Name          string          `json:"name"`
+		Provider      string          `json:"provider"`
+		Status        string          `json:"status"`
+		MsgCount      int64           `json:"msg_count"`
+		ReminderHours int             `json:"reminder_hours"`
+		CreatedAt     int64           `json:"created_at"`
+		Extra         json.RawMessage `json:"extra,omitempty"`
 	}
 	var result []botResp
 	for _, b := range bots {
@@ -40,12 +41,11 @@ func (s *Server) handleListBots(w http.ResponseWriter, r *http.Request) {
 		if inst, ok := s.BotManager.GetInstance(b.ID); ok {
 			status = inst.Status()
 		}
-		// Extract non-secret info from credentials for display
 		extra := extractPublicCredentials(b.Provider, b.Credentials)
 		result = append(result, botResp{
 			ID: b.ID, Name: b.Name, Provider: b.Provider,
-			Status: status, MsgCount: b.MsgCount, CreatedAt: b.CreatedAt,
-			Extra: extra,
+			Status: status, MsgCount: b.MsgCount, ReminderHours: b.ReminderHours,
+			CreatedAt: b.CreatedAt, Extra: extra,
 		})
 	}
 
@@ -230,15 +230,27 @@ func (s *Server) handleUpdateBot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name string `json:"name"`
+		Name          *string `json:"name"`
+		ReminderHours *int    `json:"reminder_hours"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if req.Name != "" {
-		if err := s.DB.UpdateBotName(botID, req.Name); err != nil {
+	if req.Name != nil && *req.Name != "" {
+		if err := s.DB.UpdateBotName(botID, *req.Name); err != nil {
+			jsonError(w, "update failed", http.StatusInternalServerError)
+			return
+		}
+	}
+	if req.ReminderHours != nil {
+		hours := *req.ReminderHours
+		if hours < 0 || hours > 168 { // max 7 days
+			jsonError(w, "reminder_hours must be 0-168", http.StatusBadRequest)
+			return
+		}
+		if err := s.DB.UpdateBotReminder(botID, hours); err != nil {
 			jsonError(w, "update failed", http.StatusInternalServerError)
 			return
 		}

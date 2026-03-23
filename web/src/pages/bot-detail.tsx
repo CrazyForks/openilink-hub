@@ -126,7 +126,7 @@ export function BotDetailPage() {
   const navigate = useNavigate();
   const [bot, setBot] = useState<any>(null);
   const [channels, setChannels] = useState<any[]>([]);
-  const [tab, setTab] = useState<"chat" | "channels">("chat");
+  const [tab, setTab] = useState<"chat" | "channels" | "settings">("chat");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -331,6 +331,7 @@ export function BotDetailPage() {
         <div className="flex border rounded-lg overflow-hidden">
           <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "chat" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("chat")}>消息</button>
           <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "channels" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("channels")}>通道</button>
+          <button className={`px-3 py-1 text-xs cursor-pointer ${tab === "settings" ? "bg-secondary" : "text-muted-foreground"}`} onClick={() => setTab("settings")}>设置</button>
         </div>
       </div>
 
@@ -424,8 +425,10 @@ export function BotDetailPage() {
             </Button>
           </form>
         </div>
-      ) : (
+      ) : tab === "channels" ? (
         <ChannelsTab botId={id!} channels={channels} onRefresh={loadChannels} />
+      ) : (
+        <BotSettingsTab bot={bot} onUpdate={loadBot} />
       )}
     </div>
   );
@@ -1093,6 +1096,65 @@ function CopyRow({ label, value, copied, onCopy }: { label: string; value: strin
       <button onClick={onCopy} className="cursor-pointer text-muted-foreground hover:text-foreground shrink-0">
         {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
       </button>
+    </div>
+  );
+}
+
+function BotSettingsTab({ bot, onUpdate }: { bot: any; onUpdate: () => void }) {
+  const [reminderEnabled, setReminderEnabled] = useState(bot.reminder_hours > 0);
+  const [reminderHours, setReminderHours] = useState(bot.reminder_hours || 23);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await api.updateBot(bot.id, { reminder_hours: reminderEnabled ? reminderHours : 0 } as any);
+      onUpdate();
+    } catch {}
+    setSaving(false);
+  }
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="p-4 rounded-lg border space-y-3">
+        <h3 className="text-sm font-medium">会话保活提醒</h3>
+        <p className="text-xs text-muted-foreground">
+          微信会话 24 小时未活动将过期。开启后，Bot 在设定时间内无消息会自动发送一条提醒。
+        </p>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={reminderEnabled}
+              onChange={(e) => setReminderEnabled(e.target.checked)}
+              className="w-3.5 h-3.5 accent-primary"
+            />
+            <span className="text-sm">启用提醒</span>
+          </label>
+        </div>
+        {reminderEnabled && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">无消息超过</span>
+            <input
+              type="number"
+              value={reminderHours}
+              onChange={(e) => setReminderHours(Math.max(1, Math.min(168, parseInt(e.target.value) || 23)))}
+              className="w-16 h-7 rounded border px-2 text-xs text-center"
+              min={1}
+              max={168}
+            />
+            <span className="text-xs text-muted-foreground">小时后提醒</span>
+            <span className="text-[10px] text-muted-foreground ml-2">
+              (距过期还有约 {Math.max(0, 24 - reminderHours)} 小时)
+            </span>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? "保存中..." : "保存"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
