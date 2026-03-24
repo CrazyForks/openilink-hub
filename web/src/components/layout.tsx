@@ -55,10 +55,10 @@ export function Layout() {
     <div className="h-screen flex">
       <aside className="w-52 border-r flex flex-col shrink-0 h-screen sticky top-0">
         {/* Logo */}
-        <div className="px-4 py-4 border-b shrink-0">
+        <div className="px-5 py-5 border-b shrink-0">
           <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80">
             <LayoutDashboard className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-sm">OpenILink Hub</span>
+            <span className="font-semibold text-base tracking-tight">OpenILink Hub</span>
           </Link>
         </div>
 
@@ -96,11 +96,11 @@ export function Layout() {
           </div>
           <div className="flex items-center gap-1">
             <a href="https://github.com/openilink/openilink-hub" target="_blank" rel="noopener"
-              className="flex-1 flex items-center justify-center gap-1 text-[10px] text-muted-foreground hover:text-foreground py-1 rounded hover:bg-secondary/50 transition-colors">
+              className="flex-1 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1.5 rounded-lg hover:bg-secondary/50 transition-colors">
               <Github className="w-3 h-3" /> GitHub
             </a>
             <button onClick={handleLogout}
-              className="flex-1 flex items-center justify-center gap-1 text-[10px] text-muted-foreground hover:text-foreground py-1 rounded hover:bg-secondary/50 transition-colors cursor-pointer">
+              className="flex-1 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
               <LogOut className="w-3 h-3" /> 退出
             </button>
           </div>
@@ -108,7 +108,7 @@ export function Layout() {
       </aside>
 
       <main className="flex-1 overflow-auto h-screen">
-        <div className="max-w-4xl mx-auto p-6">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:px-8 sm:py-10 lg:px-10">
           <Outlet />
         </div>
       </main>

@@ -39,19 +39,19 @@ export function PluginsPage({ embedded, tab: initialTab }: { embedded?: boolean;
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   const content = (
-    <div className="space-y-5">
+    <div className="space-y-8">
         {/* Hero banner */}
-        <div className="rounded-xl border bg-card p-5 space-y-3">
-          <div className="flex items-start justify-between gap-4">
+        <div className="space-y-5 rounded-2xl border bg-card p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-5">
             <div>
-              <h1 className="text-base font-semibold">社区驱动的 Webhook 插件</h1>
-              <p className="text-xs text-muted-foreground mt-1">
+              <h1 className="text-2xl font-semibold tracking-tight">社区驱动的 Webhook 插件</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                 一键安装到你的渠道，自动转发消息到飞书、Slack、钉钉等服务。所有插件代码公开审核，在安全沙箱中执行。
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
               {isLoggedIn && (
-                <Button variant="outline" size="sm" className="text-xs" onClick={() => setTab("submit")}>
+                <Button variant="outline" size="sm" className="px-4 text-sm" onClick={() => setTab("submit")}>
                   <Send className="w-3 h-3 mr-1" /> 提交插件
                 </Button>
               )}
@@ -59,19 +59,19 @@ export function PluginsPage({ embedded, tab: initialTab }: { embedded?: boolean;
           </div>
 
           {/* AI development callout */}
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
-            <Bot className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <div className="flex items-start gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
+            <Bot className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <div>
-              <p className="text-xs font-medium">使用 AI 编写插件</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-sm font-medium">使用 AI 编写插件</p>
+              <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
                 将以下链接发送给你的 AI 助手（Claude、ChatGPT 等），它可以直接阅读并为你生成符合规范的插件代码：
               </p>
-              <div className="flex items-center gap-2 mt-1.5">
-                <code className="text-[10px] font-mono bg-background border rounded px-2 py-1 select-all">
+              <div className="mt-3 flex items-center gap-2">
+                <code className="select-all rounded border bg-background px-2.5 py-1.5 text-xs font-mono">
                   {location.origin}/api/webhook-plugins/skill.md
                 </code>
                 <CopyButton value={`${location.origin}/api/webhook-plugins/skill.md`} />
-                <a href="/api/webhook-plugins/skill.md" target="_blank" rel="noopener" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                <a href="/api/webhook-plugins/skill.md" target="_blank" rel="noopener" className="flex items-center gap-0.5 text-xs text-primary hover:underline">
                   <BookOpen className="w-3 h-3" /> 预览文档
                 </a>
               </div>
@@ -103,11 +103,11 @@ export function PluginsPage({ embedded, tab: initialTab }: { embedded?: boolean;
         {tab === "marketplace" && (
           <div className="space-y-3">
             {plugins.length === 0 && (
-              <div className="text-center py-16 space-y-3">
+              <div className="space-y-4 py-20 text-center">
                 <Puzzle className="w-10 h-10 mx-auto text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">暂无已审核的插件</p>
                 {isLoggedIn && (
-                  <Button variant="outline" size="sm" className="text-xs" onClick={() => setTab("submit")}>
+                  <Button variant="outline" size="sm" className="px-4 text-sm" onClick={() => setTab("submit")}>
                     成为第一个贡献者
                   </Button>
                 )}
@@ -124,7 +124,7 @@ export function PluginsPage({ embedded, tab: initialTab }: { embedded?: boolean;
         {tab === "review" && (
           <div className="space-y-4">
             {plugins.length === 0 && (
-              <div className="text-center py-12">
+              <div className="py-16 text-center">
                 <Shield className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">没有待审核的插件</p>
               </div>
@@ -139,21 +139,21 @@ export function PluginsPage({ embedded, tab: initialTab }: { embedded?: boolean;
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b px-6 py-3 flex items-center justify-between shrink-0">
+      <header className="border-b px-6 py-4 sm:px-8 lg:px-12 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <Link to="/" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="w-4 h-4" /></Link>
           <Puzzle className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">Webhook 插件市场</span>
+          <span className="text-base font-semibold tracking-tight">Webhook 插件市场</span>
         </div>
         <div className="flex items-center gap-2">
-          {!isLoggedIn && <Link to="/login"><Button size="sm" className="text-xs">登录</Button></Link>}
-          {isLoggedIn && <span className="text-xs text-muted-foreground">{user.username}</span>}
+          {!isLoggedIn && <Link to="/login"><Button size="sm" className="px-3 text-sm">登录</Button></Link>}
+          {isLoggedIn && <span className="text-sm text-muted-foreground">{user.username}</span>}
         </div>
       </header>
-      <main className="flex-1 p-6 max-w-4xl mx-auto w-full">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 sm:px-8 sm:py-10">
         {content}
       </main>
-      <footer className="border-t py-3 text-center text-[10px] text-muted-foreground">
+      <footer className="border-t px-6 py-6 text-center text-sm text-muted-foreground sm:px-8">
         <a href="https://github.com/openilink/openilink-hub" target="_blank" rel="noopener" className="hover:text-primary">OpenILink Hub</a>
         {" · "}Webhook 插件运行在安全沙箱中（5s 超时 · 禁止系统访问 · 管理员审核）
       </footer>
@@ -230,17 +230,17 @@ function PluginCard({ plugin, onRefresh, isAdmin, isLoggedIn, mode }: {
   const riskLabels: Record<string, string> = { low: "低风险", medium: "中风险", high: "高风险" };
 
   return (
-    <Card className="space-y-2">
+    <Card className="space-y-4 rounded-2xl p-6 sm:p-7">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {plugin.icon && <span className="text-base">{plugin.icon}</span>}
-            <span className="font-medium text-sm">{plugin.name}</span>
+            <span className="text-base font-medium">{plugin.name}</span>
             <Badge variant={s.variant} className="text-[10px]">{s.label}</Badge>
             <span className="text-[10px] text-muted-foreground">v{plugin.version}</span>
             {plugin.license && <span className="text-[10px] text-muted-foreground">{plugin.license}</span>}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{plugin.description}</p>
+          <p className="mt-1.5 text-sm leading-7 text-muted-foreground">{plugin.description}</p>
           <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground flex-wrap">
             <span>作者: {plugin.author || "anonymous"}</span>
             {(plugin.owner_name || plugin.submitter_name) && <span>拥有者: {plugin.owner_name || plugin.submitter_name}</span>}
@@ -293,7 +293,7 @@ function PluginCard({ plugin, onRefresh, isAdmin, isLoggedIn, mode }: {
       </div>
 
       {config.length > 0 && (
-        <div className="text-[10px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           配置项：{config.map((c: any) => `${c.name} (${c.description || c.type})`).join("、")}
         </div>
       )}
@@ -383,4 +383,3 @@ function MyPluginsTab({ plugins, onRefresh }: { plugins: any[]; onRefresh: () =>
     </div>
   );
 }
-
