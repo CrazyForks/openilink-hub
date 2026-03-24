@@ -175,6 +175,31 @@ func (db *DB) ListListedApps() ([]App, error) {
 	return apps, rows.Err()
 }
 
+// ListAllApps returns all apps (admin only).
+func (db *DB) ListAllApps() ([]App, error) {
+	rows, err := db.Query(`SELECT a.id, a.owner_id, a.name, a.slug, a.description, a.icon, a.homepage,
+		a.commands, a.events, a.scopes, a.setup_url, a.redirect_url, '', a.listed, a.status,
+		EXTRACT(EPOCH FROM a.created_at)::BIGINT, EXTRACT(EPOCH FROM a.updated_at)::BIGINT,
+		COALESCE(u.username, '')
+		FROM apps a LEFT JOIN users u ON u.id = a.owner_id
+		ORDER BY a.created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var apps []App
+	for rows.Next() {
+		var a App
+		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.Slug, &a.Description, &a.Icon, &a.Homepage,
+			&a.Commands, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.Status,
+			&a.CreatedAt, &a.UpdatedAt, &a.OwnerName); err != nil {
+			return nil, err
+		}
+		apps = append(apps, a)
+	}
+	return apps, rows.Err()
+}
+
 // SetAppListed sets the listed flag (admin only).
 func (db *DB) SetAppListed(id string, listed bool) error {
 	_, err := db.Exec("UPDATE apps SET listed=$1, updated_at=NOW() WHERE id=$2", listed, id)

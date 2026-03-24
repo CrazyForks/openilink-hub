@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/openilink/openilink-hub/internal/auth"
+	"github.com/openilink/openilink-hub/internal/database"
 )
 
 // POST /api/apps/{id}/install
@@ -22,11 +24,18 @@ func (s *Server) handleInstallApp(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
 	var req struct {
-		BotID string `json:"bot_id"`
+		BotID  string `json:"bot_id"`
+		Handle string `json:"handle"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BotID == "" {
 		jsonError(w, "bot_id required", http.StatusBadRequest)
 		return
+	}
+
+	// Default handle to app slug
+	handle := req.Handle
+	if handle == "" {
+		handle = app.Slug
 	}
 
 	// Verify user owns the bot
@@ -36,14 +45,26 @@ func (s *Server) handleInstallApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check handle uniqueness on this bot
+	existing, _ := s.DB.GetInstallationByHandle(req.BotID, handle)
+	if existing != nil {
+		jsonError(w, "handle @"+handle+" already in use on this bot", http.StatusConflict)
+		return
+	}
+
 	inst, err := s.DB.InstallApp(app.ID, req.BotID)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {
-			jsonError(w, "app already installed on this bot", http.StatusConflict)
-			return
-		}
 		jsonError(w, "install failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Set handle
+	_ = s.DB.UpdateInstallation(inst.ID, inst.RequestURL, handle, inst.Config, inst.Enabled)
+	inst.Handle = handle
+
+	// Auto-notify App via redirect_url (for apps without setup_url)
+	if app.SetupURL == "" && app.RedirectURL != "" {
+		go s.notifyAppInstalled(app, inst)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -309,4 +330,70 @@ func (s *Server) handleAppAPILogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(logs)
+}
+
+// notifyAppInstalled POSTs installation credentials to the App's redirect_url.
+// The App responds with its request_url, which Hub auto-sets and verifies.
+func (s *Server) notifyAppInstalled(app *database.App, inst *database.AppInstallation) {
+	if app.RedirectURL == "" {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"installation_id": inst.ID,
+		"app_token":       inst.AppToken,
+		"signing_secret":  inst.SigningSecret,
+		"bot_id":          inst.BotID,
+		"handle":          inst.Handle,
+	})
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(app.RedirectURL, "application/json", bytes.NewReader(payload))
+	if err != nil {
+		slog.Error("notify app installed failed", "app", app.ID, "err", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		RequestURL string `json:"request_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil || result.RequestURL == "" {
+		return
+	}
+
+	// Auto-set request_url and verify
+	_ = s.DB.UpdateInstallation(inst.ID, result.RequestURL, inst.Handle, inst.Config, inst.Enabled)
+	s.autoVerifyURL(inst.ID, result.RequestURL)
+}
+
+// autoVerifyURL sends a challenge to verify the request_url.
+func (s *Server) autoVerifyURL(instID, requestURL string) {
+	challengeBytes := make([]byte, 16)
+	_, _ = rand.Read(challengeBytes)
+	challenge := hex.EncodeToString(challengeBytes)
+
+	payload, _ := json.Marshal(map[string]any{
+		"v":         1,
+		"type":      "url_verification",
+		"challenge": challenge,
+	})
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Post(requestURL, "application/json", bytes.NewReader(payload))
+	if err != nil {
+		slog.Error("auto verify url failed", "inst", instID, "err", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Challenge string `json:"challenge"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return
+	}
+	if result.Challenge == challenge {
+		_ = s.DB.SetInstallationURLVerified(instID, true)
+		slog.Info("auto verify url success", "inst", instID)
+	}
 }

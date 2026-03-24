@@ -108,10 +108,15 @@ export const api = {
 
   // Apps
   createApp: (data: any) => request<any>("/api/apps", { method: "POST", body: JSON.stringify(data) }),
-  listApps: () => request<any[]>("/api/apps"),
+  listApps: (opts?: { listed?: boolean }) => request<any[]>(`/api/apps${opts?.listed ? "?listed=true" : ""}`),
   getApp: (id: string) => request<any>(`/api/apps/${id}`),
   updateApp: (id: string, data: any) => request<any>(`/api/apps/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteApp: (id: string) => request(`/api/apps/${id}`, { method: "DELETE" }),
+
+  // Admin: Apps
+  adminListApps: () => request<any[]>("/api/admin/apps"),
+  setAppListed: (id: string, listed: boolean) =>
+    request(`/api/admin/apps/${id}/listed`, { method: "PUT", body: JSON.stringify({ listed }) }),
 
   // App Installations
   installApp: (appId: string, data: any) => request<any>(`/api/apps/${appId}/install`, { method: "POST", body: JSON.stringify(data) }),

@@ -212,6 +212,20 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w)
 }
 
+// GET /api/admin/apps — list all apps (admin only)
+func (s *Server) handleAdminListApps(w http.ResponseWriter, r *http.Request) {
+	apps, err := s.DB.ListAllApps()
+	if err != nil {
+		jsonError(w, "list failed", http.StatusInternalServerError)
+		return
+	}
+	if apps == nil {
+		apps = []database.App{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(apps)
+}
+
 // PUT /api/admin/apps/{id}/listed — toggle listed status (admin only)
 func (s *Server) handleSetAppListed(w http.ResponseWriter, r *http.Request) {
 	appID := r.PathValue("id")

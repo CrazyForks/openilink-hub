@@ -172,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("DELETE /api/admin/webhook-plugins/{id}", s.requireAdmin(s.handleDeletePlugin))
 
 	// --- Admin: apps ---
+	protected.HandleFunc("GET /api/admin/apps", s.requireAdmin(s.handleAdminListApps))
 	protected.HandleFunc("PUT /api/admin/apps/{id}/listed", s.requireAdmin(s.handleSetAppListed))
 
 	// --- Admin: system config ---
