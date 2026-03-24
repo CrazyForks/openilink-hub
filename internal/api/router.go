@@ -114,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 	// Webhook logs
 	protected.HandleFunc("GET /api/bots/{id}/webhook-logs", s.handleWebhookLogs)
 	protected.HandleFunc("GET /api/bots/{id}/traces", s.handleListTraces)
+	protected.HandleFunc("GET /api/bots/{id}/traces/{traceId}", s.handleGetTrace)
 
 	// Bot app installations
 	protected.HandleFunc("GET /api/bots/{id}/apps", s.handleListBotApps)

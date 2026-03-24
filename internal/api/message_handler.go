@@ -148,7 +148,7 @@ func (s *Server) handleListTraces(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	traces, err := s.DB.ListTraces(botID, limit)
+	spans, err := s.DB.ListRootSpans(botID, limit)
 	if err != nil {
 		slog.Error("list traces failed", "bot", botID, "err", err)
 		jsonError(w, "query failed", http.StatusInternalServerError)
@@ -156,8 +156,38 @@ func (s *Server) handleListTraces(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if traces == nil {
-		traces = []database.MessageTrace{}
+	if spans == nil {
+		spans = []database.TraceSpan{}
 	}
-	json.NewEncoder(w).Encode(traces)
+	json.NewEncoder(w).Encode(spans)
+}
+
+func (s *Server) handleGetTrace(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	botID := r.PathValue("id")
+
+	bot, err := s.DB.GetBot(botID)
+	if err != nil || bot.UserID != userID {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	traceID := r.PathValue("traceId")
+	if traceID == "" {
+		jsonError(w, "missing trace id", http.StatusBadRequest)
+		return
+	}
+
+	spans, err := s.DB.ListSpansByTrace(traceID)
+	if err != nil {
+		slog.Error("get trace failed", "traceId", traceID, "err", err)
+		jsonError(w, "query failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if spans == nil {
+		spans = []database.TraceSpan{}
+	}
+	json.NewEncoder(w).Encode(spans)
 }

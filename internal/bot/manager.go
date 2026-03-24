@@ -287,19 +287,26 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 
 	parsed := m.parseMessage(msg)
 
-	// Create trace for this message
-	trace := database.NewTraceBuilder(m.db, inst.DBID, msg.Sender, parsed.content, parsed.msgType)
-	trace.Add("receive", "from "+msg.Sender, "ok", parsed.msgType+": "+parsed.content, 0)
+	// Create OTel-style tracer for this message
+	tracer := database.NewTracer(m.db, inst.DBID)
+	rootSpan := tracer.Start("process_message", database.SpanKindInternal, map[string]any{
+		"message.sender":  msg.Sender,
+		"message.content": parsed.content,
+		"message.type":    parsed.msgType,
+		"message.id":      msg.ExternalID,
+	})
 
 	// Phase 1: Store message (independent of channels)
 	msgID := m.storeMessage(inst, msg, parsed)
-	trace.SetMessageID(msgID)
-	trace.Add("store", "message #"+fmt.Sprintf("%d", msgID), "ok", "", 0)
+	storeSpan := tracer.StartChild(rootSpan, "store", database.SpanKindInternal, map[string]any{
+		"message.db_id": msgID,
+	})
+	storeSpan.End()
 
 	// Phase 1b: Async media download (independent of channels)
 	if parsed.hasMedia && msgID > 0 {
 		go m.downloadMedia(inst, msg, msgID)
-		trace.Add("media", "async download started", "ok", "", 0)
+		rootSpan.AddEvent("media_download_started", nil)
 	}
 
 	// Phase 2: Route to channels
@@ -309,17 +316,22 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		for i, ch := range matched {
 			names[i] = ch.Name
 		}
-		trace.Add("match_channel", fmt.Sprintf("%d channels: %s", len(matched), strings.Join(names, ", ")), "ok", "", 0)
+		matchSpan := tracer.StartChild(rootSpan, "match_channel", database.SpanKindInternal, map[string]any{
+			"match.count":    len(matched),
+			"match.channels": strings.Join(names, ", "),
+		})
+		matchSpan.End()
 	}
 
 	// Phase 3: Deliver to sinks
 	m.deliverToChannels(inst, msg, parsed, matched, msgID)
 
 	// Phase 4: Deliver to Apps (with trace)
-	m.deliverToApps(inst, msg, parsed, trace)
+	m.deliverToApps(inst, msg, parsed, tracer, rootSpan)
 
-	// Flush trace to DB
-	trace.Flush()
+	// End root span and flush all spans to DB
+	rootSpan.End()
+	tracer.Flush()
 }
 
 // parsedMessage holds extracted info from an inbound message.

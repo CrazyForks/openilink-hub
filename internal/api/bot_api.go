@@ -174,16 +174,15 @@ func (s *Server) handleBotAPISend(w http.ResponseWriter, r *http.Request) {
 
 	// Append span to message trace if trace_id links to an existing trace
 	if traceID != "" {
-		detail := req.Content
+		replyContent := req.Content
 		if req.Type != "text" {
-			detail = "[" + req.Type + "] " + outMsg.FileName
+			replyContent = "[" + req.Type + "] " + outMsg.FileName
 		}
-		_ = s.DB.AppendSpan(traceID, database.TraceSpan{
-			Type:      "async_reply",
-			Name:      "Bot API → " + req.To + " (" + inst.AppName + ")",
-			Status:    "ok",
-			Detail:    detail,
-			Timestamp: time.Now().UnixMilli(),
+		_ = s.DB.AppendSpan(traceID, inst.BotID, "Bot API send_reply", database.SpanKindServer, database.StatusOK, "", map[string]any{
+			"app.name":      inst.AppName,
+			"reply.type":    req.Type,
+			"reply.to":      req.To,
+			"reply.content": replyContent,
 		})
 	}
 

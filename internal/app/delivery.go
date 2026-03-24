@@ -45,6 +45,10 @@ type DeliveryResult struct {
 	ReplyBase64 string `json:"reply_base64,omitempty"` // media as base64 (direct)
 	ReplyName   string `json:"reply_name,omitempty"`   // filename
 	StatusCode  int    `json:"status_code"`
+
+	// Trace data (for observability)
+	RequestBody  string `json:"-"`
+	ResponseBody string `json:"-"`
 }
 
 // eventEnvelope is the JSON structure POSTed to the app's request_url.

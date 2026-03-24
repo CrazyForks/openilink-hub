@@ -17,7 +17,7 @@ import (
 )
 
 // deliverToApps dispatches a message to matching App installations.
-func (m *Manager) deliverToApps(inst *Instance, msg provider.InboundMessage, p parsedMessage, trace *database.TraceBuilder) {
+func (m *Manager) deliverToApps(inst *Instance, msg provider.InboundMessage, p parsedMessage, tracer *database.Tracer, rootSpan *database.SpanBuilder) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("deliverToApps panic", "bot", inst.DBID, "err", r)
@@ -27,12 +27,12 @@ func (m *Manager) deliverToApps(inst *Instance, msg provider.InboundMessage, p p
 	content := p.content
 
 	// Check for @handle mention → route to specific app installation
-	if m.tryDeliverMention(inst, msg, p, content, trace) {
+	if m.tryDeliverMention(inst, msg, p, content, tracer, rootSpan) {
 		return
 	}
 
 	// Check for slash command: /command args
-	if m.tryDeliverCommand(inst, msg, p, content, trace) {
+	if m.tryDeliverCommand(inst, msg, p, content, tracer, rootSpan) {
 		return
 	}
 
@@ -40,17 +40,13 @@ func (m *Manager) deliverToApps(inst *Instance, msg provider.InboundMessage, p p
 	eventType := "message." + p.msgType
 	installations, err := m.appDisp.MatchEvent(inst.DBID, eventType)
 	if err != nil {
-		trace.Add("match_event", "error", "error", err.Error(), 0)
+		rootSpan.AddEvent("match_event_error", map[string]any{"error": err.Error()})
 		return
 	}
 
 	if len(installations) == 0 {
-		trace.Add("match_event", "no subscribers for "+eventType, "skip", "", 0)
+		rootSpan.AddEvent("match_event_none", map[string]any{"event_type": eventType})
 		return
-	}
-
-	for i := range installations {
-		trace.Add("match_event", installations[i].AppName+" subscribes "+eventType, "ok", "", 0)
 	}
 
 	event := appdelivery.NewEvent(eventType, map[string]any{
@@ -61,26 +57,33 @@ func (m *Manager) deliverToApps(inst *Instance, msg provider.InboundMessage, p p
 		"msg_type":   p.msgType,
 		"items":      p.relayItems,
 	})
-	event.TraceID = trace.TraceID()
+	event.TraceID = tracer.TraceID()
 
 	for i := range installations {
-		done := trace.StartTimer("deliver_app", installations[i].AppName+" ("+installations[i].RequestURL+")")
+		span := tracer.StartChild(rootSpan, "POST "+installations[i].RequestURL, database.SpanKindClient, map[string]any{
+			"app.name":    installations[i].AppName,
+			"app.slug":    installations[i].AppSlug,
+			"http.url":    installations[i].RequestURL,
+			"http.method": "POST",
+		})
 		result := m.appDisp.DeliverWithRetry(&installations[i], event)
 		if result != nil {
 			reply := result.Reply
 			if result.ReplyURL != "" {
 				reply = "[media] " + result.ReplyURL
 			}
-			done("ok", reply)
+			span.SetAttr("http.status_code", result.StatusCode)
+			span.SetAttr("http.response_body", reply)
+			span.End()
 		} else {
-			done("error", "no result")
+			span.EndWithError("no result")
 		}
-		m.sendAppResult(inst, msg.Sender, result, trace)
+		m.sendAppResult(inst, msg.Sender, result, tracer, rootSpan)
 	}
 }
 
 // tryDeliverMention checks if the message starts with @handle and routes to that installation.
-func (m *Manager) tryDeliverMention(inst *Instance, msg provider.InboundMessage, p parsedMessage, content string, trace *database.TraceBuilder) bool {
+func (m *Manager) tryDeliverMention(inst *Instance, msg provider.InboundMessage, p parsedMessage, content string, tracer *database.Tracer, rootSpan *database.SpanBuilder) bool {
 	trimmed := strings.TrimSpace(content)
 	if !strings.HasPrefix(trimmed, "@") {
 		return false
@@ -98,11 +101,11 @@ func (m *Manager) tryDeliverMention(inst *Instance, msg provider.InboundMessage,
 
 	installation, err := m.appDisp.DB.GetInstallationByHandle(inst.DBID, handle)
 	if err != nil || installation == nil || !installation.Enabled || installation.RequestURL == "" {
-		trace.Add("match_handle", "@"+handle+" not found", "skip", "", 0)
+		rootSpan.AddEvent("match_handle_miss", map[string]any{"handle": handle})
 		return false
 	}
 
-	trace.Add("match_handle", "@"+handle+" → "+installation.AppName, "ok", "", 0)
+	rootSpan.AddEvent("match_handle", map[string]any{"handle": handle, "app.name": installation.AppName})
 
 	if strings.HasPrefix(text, "/") {
 		cmdParts := strings.SplitN(text[1:], " ", 2)
@@ -116,15 +119,22 @@ func (m *Manager) tryDeliverMention(inst *Instance, msg provider.InboundMessage,
 			"sender": map[string]any{"id": msg.Sender, "name": msg.Sender},
 			"group": groupInfo(msg), "handle": handle,
 		})
-		event.TraceID = trace.TraceID()
-		done := trace.StartTimer("deliver_app", installation.AppName+" /"+command+" ("+installation.RequestURL+")")
+		event.TraceID = tracer.TraceID()
+		span := tracer.StartChild(rootSpan, "POST "+installation.RequestURL, database.SpanKindClient, map[string]any{
+			"app.name":    installation.AppName,
+			"app.slug":    installation.AppSlug,
+			"http.url":    installation.RequestURL,
+			"http.method": "POST",
+		})
 		result := m.appDisp.DeliverWithRetry(installation, event)
 		if result != nil {
-			done("ok", result.Reply)
+			span.SetAttr("http.status_code", result.StatusCode)
+			span.SetAttr("http.response_body", result.Reply)
+			span.End()
 		} else {
-			done("error", "no result")
+			span.EndWithError("no result")
 		}
-		m.sendAppResult(inst, msg.Sender, result, trace)
+		m.sendAppResult(inst, msg.Sender, result, tracer, rootSpan)
 		return true
 	}
 
@@ -132,53 +142,71 @@ func (m *Manager) tryDeliverMention(inst *Instance, msg provider.InboundMessage,
 		"sender": map[string]any{"id": msg.Sender, "name": msg.Sender},
 		"group": groupInfo(msg), "content": text, "handle": handle,
 	})
-	event.TraceID = trace.TraceID()
-	done := trace.StartTimer("deliver_app", installation.AppName+" @"+handle+" ("+installation.RequestURL+")")
+	event.TraceID = tracer.TraceID()
+	span := tracer.StartChild(rootSpan, "POST "+installation.RequestURL, database.SpanKindClient, map[string]any{
+		"app.name":    installation.AppName,
+		"app.slug":    installation.AppSlug,
+		"http.url":    installation.RequestURL,
+		"http.method": "POST",
+	})
 	result := m.appDisp.DeliverWithRetry(installation, event)
 	if result != nil {
-		done("ok", result.Reply)
+		span.SetAttr("http.status_code", result.StatusCode)
+		span.SetAttr("http.response_body", result.Reply)
+		span.End()
 	} else {
-		done("error", "no result")
+		span.EndWithError("no result")
 	}
-	m.sendAppResult(inst, msg.Sender, result, trace)
+	m.sendAppResult(inst, msg.Sender, result, tracer, rootSpan)
 	return true
 }
 
 // tryDeliverCommand checks if the message is a /command and delivers it.
-func (m *Manager) tryDeliverCommand(inst *Instance, msg provider.InboundMessage, p parsedMessage, content string, trace *database.TraceBuilder) bool {
+func (m *Manager) tryDeliverCommand(inst *Instance, msg provider.InboundMessage, p parsedMessage, content string, tracer *database.Tracer, rootSpan *database.SpanBuilder) bool {
 	installations, command, args, err := m.appDisp.MatchCommand(inst.DBID, content)
 	if err != nil {
-		trace.Add("match_command", "error", "error", err.Error(), 0)
+		rootSpan.AddEvent("match_command_error", map[string]any{"error": err.Error()})
 		return false
 	}
 	if len(installations) == 0 {
 		return false
 	}
 
-	trace.Add("match_command", "/"+command+" → "+fmt.Sprintf("%d apps", len(installations)), "ok", "args: "+args, 0)
+	rootSpan.AddEvent("match_command", map[string]any{
+		"command": command,
+		"apps":    fmt.Sprintf("%d", len(installations)),
+		"args":    args,
+	})
 
 	event := appdelivery.NewEvent("command", map[string]any{
 		"command": command, "text": args,
 		"sender": map[string]any{"id": msg.Sender, "name": msg.Sender},
 		"group": groupInfo(msg),
 	})
-	event.TraceID = trace.TraceID()
+	event.TraceID = tracer.TraceID()
 
 	for i := range installations {
-		done := trace.StartTimer("deliver_app", installations[i].AppName+" /"+command+" ("+installations[i].RequestURL+")")
+		span := tracer.StartChild(rootSpan, "POST "+installations[i].RequestURL, database.SpanKindClient, map[string]any{
+			"app.name":    installations[i].AppName,
+			"app.slug":    installations[i].AppSlug,
+			"http.url":    installations[i].RequestURL,
+			"http.method": "POST",
+		})
 		result := m.appDisp.DeliverWithRetry(&installations[i], event)
 		if result != nil {
-			done("ok", result.Reply)
+			span.SetAttr("http.status_code", result.StatusCode)
+			span.SetAttr("http.response_body", result.Reply)
+			span.End()
 		} else {
-			done("error", "no result")
+			span.EndWithError("no result")
 		}
-		m.sendAppResult(inst, msg.Sender, result, trace)
+		m.sendAppResult(inst, msg.Sender, result, tracer, rootSpan)
 	}
 	return true
 }
 
 // sendAppResult sends a reply from an App via the bot and stores it as outbound.
-func (m *Manager) sendAppResult(inst *Instance, to string, result *appdelivery.DeliveryResult, trace *database.TraceBuilder) {
+func (m *Manager) sendAppResult(inst *Instance, to string, result *appdelivery.DeliveryResult, tracer *database.Tracer, rootSpan *database.SpanBuilder) {
 	if result == nil {
 		return
 	}
@@ -189,16 +217,24 @@ func (m *Manager) sendAppResult(inst *Instance, to string, result *appdelivery.D
 
 	switch result.ReplyType {
 	case "image", "video", "file":
-		done := trace.StartTimer("reply", "send "+result.ReplyType+" to "+to)
+		span := tracer.StartChild(rootSpan, "send_reply", database.SpanKindClient, map[string]any{
+			"reply.type": result.ReplyType,
+			"reply.to":   to,
+		})
 		m.sendAppMedia(ctx, inst, to, contextToken, result)
-		done("ok", result.ReplyName)
+		span.SetAttr("reply.content", result.ReplyName)
+		span.End()
 	default:
 		if result.Reply == "" {
 			return
 		}
-		done := trace.StartTimer("reply", "send text to "+to)
+		span := tracer.StartChild(rootSpan, "send_reply", database.SpanKindClient, map[string]any{
+			"reply.type":    "text",
+			"reply.to":      to,
+			"reply.content": result.Reply,
+		})
 		m.sendAppText(ctx, inst, to, contextToken, result.Reply)
-		done("ok", result.Reply)
+		span.End()
 	}
 }
 
@@ -261,7 +297,6 @@ func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextT
 		// Extract filename from Content-Type if not provided
 		if result.ReplyName == "" {
 			if ct := resp.Header.Get("Content-Type"); ct != "" {
-				// e.g. "image/png", "image/jpeg; charset=utf-8"
 				mime := strings.SplitN(ct, ";", 2)[0]
 				mime = strings.TrimSpace(mime)
 				result.ReplyName = fileNameFromMIME(mime)
