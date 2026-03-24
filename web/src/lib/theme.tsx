@@ -16,8 +16,12 @@ function getSystemTheme(): "light" | "dark" {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "light" || stored === "dark" || stored === "system") return stored;
+    try {
+      const stored = localStorage.getItem("theme");
+      if (stored === "light" || stored === "dark" || stored === "system") return stored;
+    } catch {
+      // ignore storage errors
+    }
     return "system";
   });
 
@@ -45,7 +49,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   function setTheme(next: Theme) {
     setThemeState(next);
-    localStorage.setItem("theme", next);
+    try {
+      localStorage.setItem("theme", next);
+    } catch {
+      // ignore storage errors
+    }
   }
 
   return (

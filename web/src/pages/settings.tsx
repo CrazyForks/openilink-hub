@@ -66,13 +66,15 @@ export function SettingsPage() {
       {/* Account info */}
       <Card className="space-y-3">
         <h3 className="text-sm font-medium">外观</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2" role="group" aria-label="主题选择">
           {themeOptions.map(({ value, label, icon }) => (
             <Button
               key={value}
               variant={theme === value ? "default" : "outline"}
               size="sm"
               onClick={() => setTheme(value)}
+              aria-pressed={theme === value}
+              aria-label={label}
             >
               {icon}
               {label}
