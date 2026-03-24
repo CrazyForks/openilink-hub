@@ -125,10 +125,14 @@ func (s *Server) handleBotAPISend(w http.ResponseWriter, r *http.Request) {
 			}
 		} else if req.URL != "" {
 			var dlErr error
-			mediaData, dlErr = downloadURL(r.Context(), req.URL)
+			var mime string
+			mediaData, mime, dlErr = downloadURL(r.Context(), req.URL)
 			if dlErr != nil {
 				botAPIError(w, "download failed: "+dlErr.Error(), http.StatusBadGateway)
 				return
+			}
+			if mime != "" && req.FileName == "" {
+				req.FileName = defaultFileNameFromMIME(mime)
 			}
 		} else {
 			// Fallback: send content as text
@@ -320,17 +324,19 @@ func base64Decode(s string) ([]byte, string, error) {
 	return data, mime, err
 }
 
-func downloadURL(ctx context.Context, url string) ([]byte, error) {
+func downloadURL(ctx context.Context, url string) ([]byte, string, error) {
 	dlCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024))
+	ct := strings.SplitN(resp.Header.Get("Content-Type"), ";", 2)[0]
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024))
+	return data, strings.TrimSpace(ct), err
 }

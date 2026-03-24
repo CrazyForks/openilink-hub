@@ -222,6 +222,15 @@ func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextT
 			slog.Error("app media read failed", "err", err)
 			return
 		}
+		// Extract filename from Content-Type if not provided
+		if result.ReplyName == "" {
+			if ct := resp.Header.Get("Content-Type"); ct != "" {
+				// e.g. "image/png", "image/jpeg; charset=utf-8"
+				mime := strings.SplitN(ct, ";", 2)[0]
+				mime = strings.TrimSpace(mime)
+				result.ReplyName = fileNameFromMIME(mime)
+			}
+		}
 	} else {
 		// No media source, send text fallback
 		if result.Reply != "" {
