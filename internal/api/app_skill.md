@@ -438,7 +438,9 @@ Response:
 | `url` | No | Media URL (platform downloads and sends) |
 | `base64` | No | Base64-encoded media data |
 | `filename` | No | Filename for media |
-| `trace_id` | No | Optional trace ID for correlation |
+| `trace_id` | No | Pass the `trace_id` from the event to link this reply to the original message trace |
+
+**Important**: Pass the `trace_id` you received in the event envelope. This links your async reply back to the original message in the trace chain, making it visible in the "链路追踪" dashboard.
 
 Examples:
 ```json
@@ -739,6 +741,46 @@ func main() {
 | GET | `/bot/v1/contacts` | `contacts.read` | List contacts |
 | GET | `/bot/v1/bot` | `bot.read` | Get bot info |
 
+## Tracing
+
+Every event the platform delivers to your App includes a `trace_id` in the envelope:
+
+```json
+{
+  "v": 1,
+  "type": "event",
+  "trace_id": "tr_550e8400-e29b-41d4-a716-446655440000",
+  ...
+}
+```
+
+This `trace_id` links back to the original WeChat message. The platform records a trace for every message showing the full processing chain:
+
+```
+receive → store → match_command → deliver_app → reply → async_reply
+```
+
+**To make your async replies appear in the trace**, pass `trace_id` when calling the Bot API:
+
+```python
+def handle_event(data):
+    trace_id = data["trace_id"]  # save this
+
+    # Sync reply (automatically traced)
+    return jsonify({"reply": "Processing..."})
+
+    # Later, async reply (pass trace_id to link back)
+    requests.post(f"{HUB}/bot/v1/messages/send",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "to": sender_id,
+            "content": "Done! Here are the results...",
+            "trace_id": trace_id  # ← links to original message trace
+        })
+```
+
+Bot owners can view the full trace in **Bot detail → 链路追踪** tab.
+
 ## Tips for AI Agents
 
 When building an App:
@@ -746,7 +788,7 @@ When building an App:
 1. Always handle URL verification (`"type": "url_verification"`) first
 2. Verify the `X-Signature` on every event to ensure it comes from the platform
 3. Respond to events within 3 seconds — process asynchronously if needed
-4. Use `trace_id` from events when calling the Bot API for end-to-end tracing
+4. **Pass `trace_id` from events when calling the Bot API** for end-to-end tracing
 5. Declare minimum required scopes
 6. Handle retry gracefully — use `event.id` for deduplication
 7. Commands are triggered by `/command` or `@handle` in WeChat messages
