@@ -1,5 +1,7 @@
 -- Move request_url, signing_secret, url_verified from app_installations to apps table.
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. Add columns to apps
 ALTER TABLE apps ADD COLUMN request_url TEXT NOT NULL DEFAULT '';
 ALTER TABLE apps ADD COLUMN signing_secret TEXT NOT NULL DEFAULT '';
