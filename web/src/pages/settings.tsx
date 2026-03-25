@@ -90,18 +90,15 @@ export function SettingsPage() {
       {oauthMsg && <div className={`flex items-center gap-3 p-4 rounded-xl border animate-in fade-in ${oauthMsg.includes("失败") ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-primary/20 bg-primary/5 text-primary"}`}><span className="text-sm font-medium flex-1">{oauthMsg}</span><button onClick={() => setOauthMsg("")} className="text-xs font-bold uppercase opacity-70">关闭</button></div>}
 
       <Tabs value={activeTab} onValueChange={(v: string) => navigate(`/dashboard/settings/${v}`)} className="space-y-6">
-        <TabsList className="bg-muted/50 p-1"><TabsTrigger value="profile" className="px-6">个人资料</TabsTrigger><TabsTrigger value="security" className="px-6">安全认证</TabsTrigger><TabsTrigger value="appearance" className="px-6">界面外观</TabsTrigger></TabsList>
+        <TabsList className="bg-muted/50 p-1"><TabsTrigger value="profile" className="px-6">个人资料</TabsTrigger><TabsTrigger value="security" className="px-6">安全认证</TabsTrigger></TabsList>
 
         <TabsContent value="profile" className="m-0 space-y-6">
           <Card className="border-border/50"><CardHeader><CardTitle>基本信息</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><label className="text-sm font-medium">用户名</label><Input value={user.username} disabled className="bg-muted/30 font-mono" /></div><div className="space-y-2"><label className="text-sm font-medium">角色</label><div className="pt-2"><Badge variant="secondary" className="uppercase text-[10px] tracking-wider font-bold">{user.role}</Badge></div></div></div></CardContent></Card>
           {oauthProviders.length > 0 && (<Card className="border-border/50"><CardHeader><CardTitle>第三方绑定</CardTitle></CardHeader><CardContent className="space-y-3">{oauthProviders.map((provider) => { const account = oauthAccounts.find((a) => a.provider === provider); const linked = !!account; const Icon = providerLabels[provider]?.icon || ShieldCheck; return (<div key={provider} className="flex items-center justify-between p-4 rounded-xl border bg-muted/10"> <div className="flex items-center gap-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-background border shadow-sm"><Icon className="h-5 w-5" /></div><div><p className="text-sm font-bold uppercase">{providerLabels[provider]?.label || provider}</p><p className="text-xs text-muted-foreground">{linked ? `已关联：${account.username}` : "未连接"}</p></div></div> {linked ? (<Button variant="ghost" size="sm" className="text-destructive" onClick={async () => { if (!confirm(`解绑？`)) return; try { await api.unlinkOAuth(provider); load(); } catch (e: any) { alert(e.message); } }}><Unlink className="h-3.5 w-3.5 mr-2" /> 解绑</Button>) : (<Button variant="outline" size="sm" onClick={() => window.location.href = `/api/me/linked-accounts/${provider}/bind`}><Link2 className="h-3.5 w-3.5 mr-2" /> 绑定</Button>)}</div>); })}</CardContent></Card>)}
+          <Card className="border-border/50 max-w-2xl"><CardHeader><CardTitle>界面外观</CardTitle></CardHeader><CardContent><div className="grid grid-cols-3 gap-4">{[{ value: "light", label: "浅色", icon: Sun }, { value: "dark", label: "深色", icon: Moon }, { value: "system", label: "系统", icon: Monitor }].map((item) => (<button key={item.value} onClick={() => setTheme(item.value as Theme)} className={`flex flex-col items-center gap-3 p-4 rounded-xl border transition-all ${theme === item.value ? "border-primary bg-primary/[0.03] ring-1 ring-primary" : "bg-muted/20 border-border/50"}`}><div className={`h-10 w-10 flex items-center justify-center rounded-full ${theme === item.value ? "bg-primary text-primary-foreground shadow-md" : "bg-background text-muted-foreground border"}`}><item.icon className="h-5 w-5" /></div><p className="text-xs font-bold">{item.label}</p></button>))}</div></CardContent></Card>
         </TabsContent>
 
         <TabsContent value="security" className="m-0 space-y-6"><PasskeySection /><ChangePasswordSection /></TabsContent>
-
-        <TabsContent value="appearance" className="m-0">
-          <Card className="border-border/50 max-w-2xl"><CardHeader><CardTitle>主题</CardTitle></CardHeader><CardContent><div className="grid grid-cols-3 gap-4">{[{ value: "light", label: "浅色", icon: Sun }, { value: "dark", label: "深色", icon: Moon }, { value: "system", label: "系统", icon: Monitor }].map((item) => (<button key={item.value} onClick={() => setTheme(item.value as Theme)} className={`flex flex-col items-center gap-3 p-4 rounded-xl border transition-all ${theme === item.value ? "border-primary bg-primary/[0.03] ring-1 ring-primary" : "bg-muted/20 border-border/50"}`}><div className={`h-10 w-10 flex items-center justify-center rounded-full ${theme === item.value ? "bg-primary text-primary-foreground shadow-md" : "bg-background text-muted-foreground border"}`}><item.icon className="h-5 w-5" /></div><p className="text-xs font-bold">{item.label}</p></button>))}</div></CardContent></Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
@@ -212,7 +209,7 @@ function PasskeySection() {
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div className="space-y-1.5">
           <CardTitle className="flex items-center gap-2">
-            Passkeys <Badge className="bg-primary/10 text-primary border-none text-[9px]">RECOMMENDED</Badge>
+            通行密钥 <Badge className="bg-primary/10 text-primary border-none text-[9px]">推荐</Badge>
           </CardTitle>
           <CardDescription>
             使用生物识别（指纹、Face ID）或安全密钥进行登录，更安全、更快捷。

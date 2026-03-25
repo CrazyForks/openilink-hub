@@ -211,7 +211,7 @@ export function BotTracesTab({ botId }: { botId: string }) {
                       <div className="flex items-center gap-2">
                         <StatusIcon code={root.status_code} size="w-3.5 h-3.5" />
                         <Badge variant="secondary" className="text-[9px] h-4 leading-none uppercase">
-                          {root.attributes?.["message.type"] || "EXEC"}
+                          {root.attributes?.["message.type"] || "执行"}
                         </Badge>
                       </div>
                     </TableCell>
@@ -240,7 +240,7 @@ export function BotTracesTab({ botId }: { botId: string }) {
           <SheetHeader className="mb-6">
             <div className="flex items-center gap-2 mb-1 text-primary">
               <Layers className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-widest">Trace Timeline</span>
+              <span className="text-xs font-bold uppercase tracking-widest">追踪时间线</span>
             </div>
             <SheetTitle className="text-xl font-mono truncate">{selectedTraceId}</SheetTitle>
             <SheetDescription>

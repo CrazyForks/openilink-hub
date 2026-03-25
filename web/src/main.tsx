@@ -10,10 +10,13 @@ import { BotDetailPage } from "./pages/bot-detail";
 import { SettingsPage } from "./pages/settings";
 import { PluginsPage } from "./pages/plugins";
 import { ChannelDetailPage } from "./pages/channel-detail";
-import { AdminPage } from "./pages/admin";
+import { AdminOverviewPage } from "./pages/admin-overview";
+import { AdminUsersPage } from "./pages/admin-users";
+import { AdminReviewsPage } from "./pages/admin-reviews";
 import { AppsPage } from "./pages/apps";
 import { AppDetailPage } from "./pages/app-detail";
 import { DashboardOverviewPage } from "./pages/dashboard-overview";
+import { TracesPage } from "./pages/traces";
 import { ThemeProvider } from "./lib/theme";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/toaster";
@@ -31,18 +34,16 @@ createRoot(document.getElementById("root")!).render(
             {/* Main Application Shell */}
             <Route path="/dashboard" element={<Layout />}>
               <Route index element={<Navigate to="overview" replace />} />
-              
+
               {/* Domain 1: Workspace */}
               <Route path="overview" element={<DashboardOverviewPage />} />
               <Route path="accounts" element={<BotsPage />} />
               <Route path="accounts/:id" element={<BotDetailPage />}>
-                <Route index element={<Navigate to="chat" replace />} />
-                <Route path="chat" element={null} />
+                <Route index element={<Navigate to="channels" replace />} />
                 <Route path="channels" element={null} />
                 <Route path="apps" element={null} />
-                <Route path="traces" element={null} />
-                <Route path="settings" element={null} />
               </Route>
+              <Route path="accounts/:id/traces" element={<TracesPage />} />
               <Route path="accounts/:id/channel/:cid" element={<ChannelDetailPage />}>
                 <Route index element={<Navigate to="overview" replace />} />
                 <Route path="overview" element={null} />
@@ -66,18 +67,14 @@ createRoot(document.getElementById("root")!).render(
               </Route>
 
               {/* Domain 4: Management & Ops */}
-              <Route path="admin" element={<AdminPage />}>
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={null} />
-                <Route path="users" element={null} />
-                <Route path="config" element={null} />
-                <Route path="apps" element={null} />
-              </Route>
+              <Route path="admin" element={<Navigate to="/dashboard/admin/overview" replace />} />
+              <Route path="admin/overview" element={<AdminOverviewPage />} />
+              <Route path="admin/users" element={<AdminUsersPage />} />
+              <Route path="admin/reviews" element={<AdminReviewsPage />} />
               <Route path="settings" element={<SettingsPage />}>
                 <Route index element={<Navigate to="profile" replace />} />
                 <Route path="profile" element={null} />
                 <Route path="security" element={null} />
-                <Route path="appearance" element={null} />
               </Route>
             </Route>
           </Routes>

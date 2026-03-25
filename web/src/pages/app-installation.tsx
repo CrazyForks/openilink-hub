@@ -153,8 +153,8 @@ function InstallationConfig({
     <div className="space-y-4">
       <Card className="space-y-3">
         <h3 className="text-sm font-medium">凭证</h3>
-        <SecretField label="App Token" value={installation.app_token || ""} />
-        <SecretField label="Signing Secret" value={installation.signing_secret || ""} />
+        <SecretField label="应用令牌" value={installation.app_token || ""} />
+        <SecretField label="签名密钥" value={installation.signing_secret || ""} />
         <Button
           variant="outline"
           size="sm"

@@ -1,82 +1,38 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, Link, useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
-  ArrowLeft,
-  Send,
+  ArrowUpRight,
   Cable,
-  Copy,
-  Check,
   Plus,
   Trash2,
-  RotateCw,
-  X,
   Bot as BotIcon,
-  Webhook,
-  Paperclip,
-  QrCode,
-  Puzzle,
-  MessageSquare,
-  Activity,
-  Settings,
-  Info,
-  ChevronRight,
   Zap,
-  LayoutDashboard,
-  Terminal,
   Cpu,
   Unplug,
-  ArrowUpRight,
+  MessageSquare,
+  Activity,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import { api } from "../lib/api";
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
   Card,
-  CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { BotAppsTab } from "./bot-apps-tab";
-import { BotTracesTab } from "./bot-traces-tab";
-
-type MessageItem = { type: string; text?: string; file_name?: string };
-type Message = {
-  id: number;
-  bot_id?: string;
-  direction: string;
-  item_list: MessageItem[];
-  media_status?: string;
-  media_keys?: Record<string, string>;
-  created_at: number;
-  _sending?: boolean;
-  _error?: string;
-};
-
-// --- Message Components kept from previous for functionality ---
-function MessageContent({ m }: { m: Message }) {
-  const items = m.item_list || [];
-  if (items.length === 0) return <span className="text-muted-foreground italic">[Empty]</span>;
-  return (
-    <div className="space-y-2">
-      {items.map((item, i) => (
-        <p key={i} className="leading-relaxed whitespace-pre-wrap">{item.text}</p>
-      ))}
-    </div>
-  );
-}
+import { ChatPanel } from "./chat-panel";
 
 export function BotDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,9 +42,11 @@ export function BotDetailPage() {
   const [bot, setBot] = useState<any>(null);
   const [channels, setChannels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Tabs synced with URL
-  const activeTab = location.pathname.split("/").pop() || "chat";
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Tabs synced with URL — only "channels" and "apps" are valid
+  const rawTab = location.pathname.split("/").pop() || "channels";
+  const activeTab = rawTab === "channels" || rawTab === "apps" ? rawTab : "channels";
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +64,17 @@ export function BotDetailPage() {
   }, [id, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleAutoRenewalChange = async (checked: boolean) => {
+    const hours = checked ? 23 : 0;
+    try {
+      await api.updateBot(bot.id, { reminder_hours: hours });
+      toast({ title: "已保存" });
+      load();
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "保存失败", description: e.message });
+    }
+  };
 
   if (loading) return <div className="space-y-6"><Skeleton className="h-20 w-full rounded-3xl" /><Skeleton className="h-96 w-full rounded-3xl" /></div>;
   if (!bot) return <div className="py-20 text-center space-y-4"><Unplug className="h-12 w-12 mx-auto opacity-20" /><p className="font-bold">未找到账号</p><Button variant="link" onClick={() => navigate("/dashboard/accounts")}>返回列表</Button></div>;
@@ -133,6 +102,26 @@ export function BotDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+           {/* Inline auto-renewal checkbox */}
+           <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground cursor-pointer select-none">
+             <input
+               type="checkbox"
+               checked={(bot.reminder_hours || 0) > 0}
+               onChange={(e) => handleAutoRenewalChange(e.target.checked)}
+               className="h-4 w-4 accent-primary"
+             />
+             自动续期
+           </label>
+           <Separator orientation="vertical" className="h-5" />
+           <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs gap-1.5" onClick={() => setChatOpen(true)}>
+             <MessageSquare className="h-3.5 w-3.5" />
+             消息控制台
+           </Button>
+           <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs gap-1.5" onClick={() => navigate(`/dashboard/accounts/${id}/traces`)}>
+             <Activity className="h-3.5 w-3.5" />
+             消息追踪
+           </Button>
+           <Separator orientation="vertical" className="h-5" />
            <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs" onClick={() => navigate("/dashboard/accounts")}>
              返回列表
            </Button>
@@ -144,81 +133,22 @@ export function BotDetailPage() {
 
       <Tabs value={activeTab} onValueChange={(v: string) => navigate(`/dashboard/accounts/${id}/${v}`)} className="flex-1 flex flex-col space-y-6">
         <TabsList className="bg-muted/50 p-1 w-fit rounded-xl border border-border/50">
-          <TabsTrigger value="chat" className="gap-2 px-6 rounded-lg font-bold text-xs uppercase tracking-widest"><MessageSquare className="h-3.5 w-3.5" /> 消息</TabsTrigger>
           <TabsTrigger value="channels" className="gap-2 px-6 rounded-lg font-bold text-xs uppercase tracking-widest"><Cable className="h-3.5 w-3.5" /> 转发规则</TabsTrigger>
           <TabsTrigger value="apps" className="gap-2 px-6 rounded-lg font-bold text-xs uppercase tracking-widest"><Zap className="h-3.5 w-3.5" /> 应用</TabsTrigger>
-          <TabsTrigger value="traces" className="gap-2 px-6 rounded-lg font-bold text-xs uppercase tracking-widest"><Activity className="h-3.5 w-3.5" /> 日志</TabsTrigger>
-          <TabsTrigger value="settings" className="gap-2 px-6 rounded-lg font-bold text-xs uppercase tracking-widest"><Settings className="h-3.5 w-3.5" /> 设置</TabsTrigger>
         </TabsList>
 
         <div className="flex-1">
-          {activeTab === "chat" && <ChatTab botId={id!} />}
           {activeTab === "channels" && <ChannelsTab botId={id!} channels={channels} onRefresh={load} />}
           {activeTab === "apps" && <BotAppsTab botId={id!} />}
-          {activeTab === "traces" && <BotTracesTab botId={id!} />}
-          {activeTab === "settings" && <BotSettingsTab bot={bot} onUpdate={load} />}
         </div>
       </Tabs>
+
+      <ChatPanel botId={id!} open={chatOpen} onOpenChange={setChatOpen} />
     </div>
   );
 }
 
-// ... Specific Tabs ---
-
-function ChatTab({ botId }: { botId: string }) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const fetchMessages = async () => {
-    try {
-      const res = await api.messages(botId, 30);
-      setMessages((res.messages || []).reverse());
-    } catch {}
-  };
-
-  useEffect(() => {
-    fetchMessages();
-    const t = setInterval(fetchMessages, 5000);
-    return () => clearInterval(t);
-  }, [botId]);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
-
-  return (
-    <div className="flex flex-col h-[600px] rounded-[2rem] border bg-card/30 overflow-hidden shadow-sm">
-       <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/20">
-          <div className="flex items-center gap-2">
-             <Terminal className="h-4 w-4 text-primary" />
-             <span className="text-xs font-bold uppercase tracking-widest">Realtime Console</span>
-          </div>
-          <Badge variant="outline" className="bg-background text-[10px] font-bold">LIVE STREAMING</Badge>
-       </div>
-       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((m) => (
-            <div key={m.id} className={`flex ${m.direction === "inbound" ? "justify-start" : "justify-end"}`}>
-               <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm font-medium ${m.direction === "inbound" ? "bg-background border border-border/50 text-foreground rounded-bl-none shadow-sm" : "bg-primary text-primary-foreground rounded-br-none shadow-lg shadow-primary/10"}`}>
-                  <MessageContent m={m} />
-                  <p className={`text-[9px] mt-1.5 font-bold uppercase opacity-40 ${m.direction === "inbound" ? "text-left" : "text-right"}`}>
-                    {new Date(m.created_at * 1000).toLocaleTimeString()}
-                  </p>
-               </div>
-            </div>
-          ))}
-       </div>
-       <div className="p-4 bg-muted/20 border-t">
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); api.sendMessage(botId, { text: input }); setInput(""); }}>
-             <Input value={input} onChange={e => setInput(e.target.value)} placeholder="输入消息..." className="h-11 rounded-xl bg-background border-none shadow-inner" />
-             <Button type="submit" className="h-11 rounded-xl px-6 gap-2 font-bold shadow-lg shadow-primary/20">
-                发送 <Send className="h-4 w-4" />
-             </Button>
-          </form>
-       </div>
-    </div>
-  );
-}
+// --- ChannelsTab ---
 
 function ChannelsTab({ botId, channels, onRefresh }: { botId: string; channels: any[]; onRefresh: () => void }) {
   const navigate = useNavigate();
@@ -231,7 +161,7 @@ function ChannelsTab({ botId, channels, onRefresh }: { botId: string; channels: 
                   <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                     <Cable className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <Badge variant={ch.enabled ? "default" : "secondary"} className="h-5 rounded-full text-[9px] font-black uppercase">{ch.enabled ? "Active" : "Paused"}</Badge>
+                  <Badge variant={ch.enabled ? "default" : "secondary"} className="h-5 rounded-full text-[9px] font-black uppercase">{ch.enabled ? "运行中" : "已暂停"}</Badge>
                </div>
                <CardTitle className="text-lg font-bold mt-4">{ch.name}</CardTitle>
                <CardDescription className="font-mono text-[10px] uppercase">@{ch.handle || "默认"}</CardDescription>
@@ -247,48 +177,5 @@ function ChannelsTab({ botId, channels, onRefresh }: { botId: string; channels: 
           <span className="font-bold text-xs uppercase tracking-[0.2em] text-muted-foreground">添加转发规则</span>
        </Button>
     </div>
-  );
-}
-
-function BotSettingsTab({ bot, onUpdate }: { bot: any; onUpdate: () => void }) {
-  const [hours, setHours] = useState(bot.reminder_hours || 0);
-  const { toast } = useToast();
-
-  const handleSave = async () => {
-    await api.updateBot(bot.id, { reminder_hours: hours } as any);
-    toast({ title: "已保存" });
-    onUpdate();
-  };
-
-  return (
-    <Card className="max-w-2xl border-border/50 bg-card/50 rounded-[2rem]">
-       <CardHeader>
-          <CardTitle className="text-xl font-bold">设置</CardTitle>
-          <CardDescription>调整账号相关配置。</CardDescription>
-       </CardHeader>
-       <CardContent className="space-y-8">
-          <div className="space-y-4">
-             <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                   <p className="text-sm font-bold">自动续期</p>
-                   <p className="text-xs text-muted-foreground">微信会话 24 小时不活动会掉线，开启后系统自动保持在线。</p>
-                </div>
-                <input type="checkbox" checked={hours > 0} onChange={e => setHours(e.target.checked ? 23 : 0)} className="h-5 w-5 accent-primary" />
-             </div>
-             {hours > 0 && (
-               <div className="p-4 rounded-2xl bg-muted/30 border space-y-3 animate-in fade-in zoom-in-95">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">检查间隔（小时）</label>
-                  <div className="flex gap-4 items-center">
-                    <Input type="number" value={hours} onChange={e => setHours(parseInt(e.target.value))} className="w-24 h-11 rounded-xl font-bold text-center" />
-                    <p className="text-xs text-muted-foreground italic leading-snug">建议 23 小时。</p>
-                  </div>
-               </div>
-             )}
-          </div>
-       </CardContent>
-       <CardFooter className="bg-muted/30 pt-4 flex justify-end">
-          <Button onClick={handleSave} className="rounded-full px-8 font-bold shadow-lg shadow-primary/20">保存</Button>
-       </CardFooter>
-    </Card>
   );
 }

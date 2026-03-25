@@ -4,13 +4,12 @@ import {
   LogOut,
   Github,
   Bot,
-  User,
   ShieldCheck,
-  Settings,
   Blocks,
   Sun,
   Moon,
   ChevronsUpDown,
+  ChevronRight,
   Cpu,
   Home,
   Zap,
@@ -18,6 +17,9 @@ import {
   Search,
   Layers,
   MonitorDot,
+  BarChart3,
+  Puzzle,
+  Circle,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useTheme } from "../lib/theme";
@@ -32,11 +34,19 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,15 +67,34 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import * as React from "react";
 
+const statusColors: Record<string, string> = {
+  connected: "text-green-500 fill-green-500",
+  disconnected: "text-muted-foreground fill-muted-foreground",
+  error: "text-destructive fill-destructive",
+  session_expired: "text-destructive fill-destructive",
+};
+
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<any>(null);
+  const [bots, setBots] = useState<any[]>([]);
   const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     api.me().then(setUser).catch(() => navigate("/login", { replace: true }));
   }, []);
+
+  useEffect(() => {
+    if (user) api.listBots().then(b => setBots(b || [])).catch(() => {});
+  }, [user]);
+
+  // Refresh bot list when navigating back to accounts area
+  useEffect(() => {
+    if (user && location.pathname.startsWith("/dashboard/accounts")) {
+      api.listBots().then(b => setBots(b || [])).catch(() => {});
+    }
+  }, [location.pathname]);
 
   if (!user) return null;
 
@@ -81,8 +110,11 @@ export function Layout() {
     const labels: Record<string, string> = {
       dashboard: "控制台", accounts: "账号管理",
       apps: "应用", plugins: "插件", overview: "概览",
+      marketplace: "市场", my: "我的",
       "webhook-plugins": "Webhook 插件", settings: "设置",
-      profile: "个人资料", security: "安全", appearance: "外观", admin: "系统管理"
+      profile: "个人资料", security: "安全",
+      admin: "系统管理", users: "用户管理", reviews: "审核中心",
+      channels: "转发规则", traces: "消息追踪",
     };
     let label = labels[segment] || segment;
     if (segment.length > 20) label = "详情"; // Handle IDs
@@ -110,6 +142,7 @@ export function Layout() {
         </SidebarHeader>
 
         <SidebarContent>
+          {/* Overview */}
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -118,31 +151,130 @@ export function Layout() {
                     <Link to="/dashboard/overview"><MonitorDot /><span>概览</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isActive("/dashboard/accounts")} tooltip="账号管理">
-                    <Link to="/dashboard/accounts"><Bot /><span>账号管理</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isActive("/dashboard/apps")} tooltip="应用">
-                    <Link to="/dashboard/apps"><Blocks /><span>应用</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isActive("/dashboard/plugins")} tooltip="插件">
-                    <Link to="/dashboard/plugins"><Layers /><span>插件</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                {isAdmin && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={isActive("/dashboard/admin")} tooltip="系统管理">
-                      <Link to="/dashboard/admin"><ShieldCheck /><span>系统管理</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+
+          {/* 账号管理 — collapsible with bot list */}
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <Collapsible defaultOpen={isActive("/dashboard/accounts")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={isActive("/dashboard/accounts")} tooltip="账号管理">
+                        <Bot />
+                        <span>账号管理</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild size="sm" isActive={location.pathname === "/dashboard/accounts"}>
+                            <Link to="/dashboard/accounts">全部账号</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        {bots.map((b) => (
+                          <SidebarMenuSubItem key={b.id}>
+                            <SidebarMenuSubButton asChild size="sm" isActive={isActive(`/dashboard/accounts/${b.id}`)}>
+                              <Link to={`/dashboard/accounts/${b.id}`}>
+                                <Circle className={`size-2 ${statusColors[b.status] || "text-muted-foreground"}`} />
+                                <span className="truncate">{b.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {/* 扩展 — collapsible with apps & plugins */}
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <Collapsible defaultOpen={isActive("/dashboard/apps") || isActive("/dashboard/plugins")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={isActive("/dashboard/apps") || isActive("/dashboard/plugins")} tooltip="扩展">
+                        <Puzzle />
+                        <span>扩展</span>
+                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild size="sm" isActive={isActive("/dashboard/apps/marketplace")}>
+                            <Link to="/dashboard/apps/marketplace">应用市场</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild size="sm" isActive={location.pathname === "/dashboard/apps/my" || location.pathname === "/dashboard/apps"}>
+                            <Link to="/dashboard/apps/my">我的应用</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild size="sm" isActive={isActive("/dashboard/plugins/marketplace") || location.pathname === "/dashboard/plugins"}>
+                            <Link to="/dashboard/plugins/marketplace">插件市场</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild size="sm" isActive={isActive("/dashboard/plugins/my")}>
+                            <Link to="/dashboard/plugins/my">我的插件</Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {/* 管理 — admin only */}
+          {isAdmin && (
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <Collapsible defaultOpen={isActive("/dashboard/admin")} className="group/collapsible">
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton isActive={isActive("/dashboard/admin")} tooltip="管理">
+                          <ShieldCheck />
+                          <span>管理</span>
+                          <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild size="sm" isActive={location.pathname === "/dashboard/admin/overview"}>
+                              <Link to="/dashboard/admin/overview">系统概览</Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild size="sm" isActive={isActive("/dashboard/admin/users")}>
+                              <Link to="/dashboard/admin/users">用户管理</Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild size="sm" isActive={isActive("/dashboard/admin/reviews")}>
+                              <Link to="/dashboard/admin/reviews">审核中心</Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
 
         <SidebarFooter>
@@ -170,7 +302,7 @@ export function Layout() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-xl shadow-2xl" side="top" align="end" sideOffset={8}>
-                  <DropdownMenuItem asChild><a href="https://github.com/openilink/openilink-hub" target="_blank" className="cursor-pointer font-medium"><Github className="mr-2 h-4 w-4" />GitHub Project</a></DropdownMenuItem>
+                  <DropdownMenuItem asChild><a href="https://github.com/openilink/openilink-hub" target="_blank" className="cursor-pointer font-medium"><Github className="mr-2 h-4 w-4" />GitHub 项目</a></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} className="cursor-pointer font-medium">{resolvedTheme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}切换外观主题</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={async () => { await api.logout(); navigate("/login"); }} className="cursor-pointer font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"><LogOut className="mr-2 h-4 w-4" />退出登录</DropdownMenuItem>

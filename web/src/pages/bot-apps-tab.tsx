@@ -406,7 +406,7 @@ function InstallationConfig({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Request URL</label>
+          <label className="text-xs text-muted-foreground">请求地址</label>
           <div className="flex gap-1">
             <Input
               value={requestUrl}

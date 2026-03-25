@@ -122,7 +122,7 @@ function MarketplaceTab() {
                   <CardTitle className="text-lg font-bold truncate group-hover:text-primary transition-colors">{app.name}</CardTitle>
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="secondary" className="text-[9px] h-4 font-bold uppercase tracking-tighter bg-primary/5 text-primary border-none">
-                      {app.tools?.length || 0} TOOLS
+                      {app.tools?.length || 0} 个工具
                     </Badge>
                     <Badge variant="outline" className="text-[9px] h-4 font-bold uppercase tracking-tighter opacity-60">
                       {app.status}
@@ -296,7 +296,7 @@ function MyAppsTab() {
             <DialogHeader><DialogTitle className="text-2xl font-bold">创建应用</DialogTitle><DialogDescription>填写基本信息。</DialogDescription></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-5 pt-4">
                <div className="space-y-2"><label className="text-xs font-bold uppercase text-muted-foreground">名称</label><Input placeholder="例如: 通知助手" value={form.name} onChange={e => { const n = e.target.value; setForm({...form, name: n, slug: slugify(n)}); }} /></div>
-               <div className="space-y-2"><label className="text-xs font-bold uppercase text-muted-foreground">Unique Slug</label><Input value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className="font-mono" /></div>
+               <div className="space-y-2"><label className="text-xs font-bold uppercase text-muted-foreground">唯一标识</label><Input value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className="font-mono" /></div>
                <div className="space-y-2"><label className="text-xs font-bold uppercase text-muted-foreground">描述</label><Input placeholder="这个应用是用来..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
                <DialogFooter className="pt-4"><Button type="submit" className="w-full rounded-full h-11">创建</Button></DialogFooter>
             </form>
@@ -315,10 +315,10 @@ function MyAppsTab() {
                   <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{app.slug}</p>
                 </div>
               </div>
-              <Badge variant={app.status === "active" ? "default" : "secondary"} className="h-5 rounded-full text-[9px] px-2 font-bold">{app.status || "DRAFT"}</Badge>
+              <Badge variant={app.status === "active" ? "default" : "secondary"} className="h-5 rounded-full text-[9px] px-2 font-bold">{app.status === "active" ? "已发布" : "草稿"}</Badge>
             </CardHeader>
             <CardFooter className="bg-muted/30 pt-3 flex justify-between items-center px-6">
-               <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5"><Rocket className="h-3 w-3" /> {app.tools?.length || 0} Tools Configured</span>
+               <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5"><Rocket className="h-3 w-3" /> {app.tools?.length || 0} 个工具已配置</span>
                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
             </CardFooter>
           </Card>

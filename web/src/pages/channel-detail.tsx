@@ -144,7 +144,7 @@ export function ChannelDetailPage() {
                 <BotIcon className="h-3 w-3" /> {bot.name}
               </Link>
               <ChevronRight className="h-3 w-3 opacity-30" />
-              <span>Channel ID: {channel.id.slice(0, 8)}</span>
+              <span>规则 ID: {channel.id.slice(0, 8)}</span>
             </div>
           </div>
         </div>
@@ -190,7 +190,7 @@ export function ChannelDetailPage() {
                <CardHeader className="pb-3"><CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">API Key</CardTitle></CardHeader>
                <CardContent className="space-y-4">
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Channel Key</p>
+                    <p className="text-xs text-muted-foreground">频道密钥</p>
                     <div className="flex items-center gap-2">
                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono truncate max-w-[140px]">{channel.api_key}</code>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(channel.api_key); toast({ title: "已复制 API Key" }); }}>
@@ -235,11 +235,11 @@ export function ChannelDetailPage() {
             <CardContent className="space-y-4">
                <div className="rounded-lg bg-muted/50 p-4 border font-mono text-[11px] space-y-4 leading-relaxed">
                   <div>
-                    <p className="text-primary font-bold mb-1">// WebSocket (Realtime)</p>
+                    <p className="text-primary font-bold mb-1">// WebSocket（实时推送）</p>
                     <code className="block bg-background p-2 rounded border">{`ws://${window.location.host}/api/v1/channels/connect?key=${channel.api_key.slice(0, 12)}...`}</code>
                   </div>
                   <div>
-                    <p className="text-primary font-bold mb-1">// HTTP POST (Reply)</p>
+                    <p className="text-primary font-bold mb-1">// HTTP POST（发送回复）</p>
                     <code className="block bg-background p-2 rounded border">{`POST ${window.location.origin}/api/v1/channels/send?key=${channel.api_key.slice(0, 12)}...`}</code>
                   </div>
                </div>
@@ -425,13 +425,13 @@ function AITab({ channel, botId, onRefresh }: { channel: any; botId: string; onR
           </div>
           {form.source === "custom" && (
             <div className="grid gap-4 sm:grid-cols-2 border rounded-xl p-4 bg-muted/20">
-              <div className="sm:col-span-2 space-y-1.5"><label className="text-[11px] font-bold uppercase">Endpoint</label><Input placeholder="https://api.openai.com/v1" value={form.baseUrl} onChange={e => setForm({...form, baseUrl: e.target.value})} className="h-9 font-mono text-xs" /></div>
+              <div className="sm:col-span-2 space-y-1.5"><label className="text-[11px] font-bold uppercase">接口地址</label><Input placeholder="https://api.openai.com/v1" value={form.baseUrl} onChange={e => setForm({...form, baseUrl: e.target.value})} className="h-9 font-mono text-xs" /></div>
               <div className="space-y-1.5"><label className="text-[11px] font-bold uppercase">API Key</label><Input type="password" placeholder="sk-..." value={form.apiKey} onChange={e => setForm({...form, apiKey: e.target.value})} className="h-9 font-mono text-xs" /></div>
-              <div className="space-y-1.5"><label className="text-[11px] font-bold uppercase">Model</label><Input placeholder="gpt-4o" value={form.model} onChange={e => setForm({...form, model: e.target.value})} className="h-9 font-mono text-xs" /></div>
+              <div className="space-y-1.5"><label className="text-[11px] font-bold uppercase">模型</label><Input placeholder="gpt-4o" value={form.model} onChange={e => setForm({...form, model: e.target.value})} className="h-9 font-mono text-xs" /></div>
             </div>
           )}
           <div className="space-y-2">
-            <label className="text-xs font-medium">系统提示词 (System Prompt)</label>
+            <label className="text-xs font-medium">系统提示词</label>
             <textarea value={form.prompt} onChange={e => setForm({...form, prompt: e.target.value})} className="w-full h-24 bg-muted/30 border rounded-md p-3 text-xs leading-relaxed focus:outline-none" placeholder="你是一个智能助理..." />
           </div>
           <div className="flex items-center gap-4">

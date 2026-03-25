@@ -27,7 +27,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { SubmitForm } from "./plugin-submit";
-import { ReviewCard } from "./plugin-review";
 import {
   Tabs,
   TabsContent,
@@ -59,7 +58,7 @@ export function PluginsPage({ embedded }: { embedded?: boolean }) {
     try {
       if (!user) setUser(await api.me().catch(() => null));
       if (activeTab === "my") setMyPlugins((await api.myPlugins().catch(() => [])) || []);
-      else setPlugins((await api.listPlugins(activeTab === "review" ? "pending" : "approved").catch(() => [])) || []);
+      else setPlugins((await api.listPlugins("approved").catch(() => [])) || []);
     } finally { setLoading(false); }
   }
 
@@ -87,7 +86,6 @@ export function PluginsPage({ embedded }: { embedded?: boolean }) {
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="marketplace" className="px-6">市场</TabsTrigger>
           {isLoggedIn && <TabsTrigger value="my" className="px-6">我的插件</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="review" className="px-6">审核</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="marketplace" className="m-0">
@@ -99,7 +97,6 @@ export function PluginsPage({ embedded }: { embedded?: boolean }) {
           )}
         </TabsContent>
         <TabsContent value="my" className="m-0"><MyPluginsTab plugins={myPlugins} onRefresh={load} /></TabsContent>
-        <TabsContent value="review" className="m-0"><div className="grid gap-6">{plugins.map((p) => <ReviewCard key={p.id} plugin={p} onRefresh={load} />)}</div></TabsContent>
       </Tabs>
     </div>
   );

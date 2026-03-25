@@ -258,7 +258,7 @@ export function LoginPage() {
         </Card>
 
         <footer className="mt-8 text-center text-[11px] text-muted-foreground/50 font-medium">
-           &copy; 2026 OpeniLink Hub Project. All rights reserved.
+           &copy; 2026 OpeniLink Hub 项目保留所有权利。
         </footer>
       </div>
     </div>
