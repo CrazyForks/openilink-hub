@@ -29,13 +29,13 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,17 +112,17 @@ export function BotsPage() {
           <Button variant="outline" onClick={load} disabled={loading} className="h-10">
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> 刷新
           </Button>
-          <Sheet open={binding} onOpenChange={(o: boolean) => { setBinding(o); if(o) startBind(); else setQrUrl(""); }}>
-            <SheetTrigger asChild>
+          <Dialog open={binding} onOpenChange={(o: boolean) => { setBinding(o); if(o) startBind(); else setQrUrl(""); }}>
+            <DialogTrigger asChild>
               <Button className="h-10 px-6 shadow-lg shadow-primary/20">
                 <Plus className="mr-2 h-4 w-4" /> 添加账号
               </Button>
-            </SheetTrigger>
-            <SheetContent className="sm:max-w-md">
-              <SheetHeader className="text-left">
-                <SheetTitle className="text-xl">扫码登录</SheetTitle>
-                <SheetDescription>使用微信扫码登录。</SheetDescription>
-              </SheetHeader>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-xl">扫码登录</DialogTitle>
+                <DialogDescription>使用微信扫码登录。</DialogDescription>
+              </DialogHeader>
               <div className="flex flex-col items-center justify-center gap-8 py-12">
                 <div className="relative group">
                   <div className="absolute -inset-4 bg-primary/5 rounded-[2rem] blur-xl group-hover:bg-primary/10 transition-all" />
@@ -152,8 +152,8 @@ export function BotsPage() {
                    </div>
                 </div>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

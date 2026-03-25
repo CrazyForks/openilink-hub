@@ -25,12 +25,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -235,18 +235,18 @@ export function BotTracesTab({ botId }: { botId: string }) {
         </Table>
       </div>
 
-      <Sheet open={!!selectedTraceId} onOpenChange={(open: boolean) => !open && setSelectedTraceId(null)}>
-        <SheetContent className="sm:max-w-xl">
-          <SheetHeader className="mb-6">
+      <Dialog open={!!selectedTraceId} onOpenChange={(open: boolean) => !open && setSelectedTraceId(null)}>
+        <DialogContent className="sm:max-w-xl max-h-[80vh] flex flex-col">
+          <DialogHeader className="mb-6">
             <div className="flex items-center gap-2 mb-1 text-primary">
               <Layers className="w-4 h-4" />
               <span className="text-xs font-bold uppercase tracking-widest">追踪时间线</span>
             </div>
-            <SheetTitle className="text-xl font-mono truncate">{selectedTraceId}</SheetTitle>
-            <SheetDescription>
+            <DialogTitle className="text-xl font-mono truncate">{selectedTraceId}</DialogTitle>
+            <DialogDescription>
               点击节点展开查看详情。
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           {traceLoading ? (
             <div className="space-y-4 py-8">
@@ -255,7 +255,7 @@ export function BotTracesTab({ botId }: { botId: string }) {
               <Skeleton className="h-8 w-[85%] ml-auto" />
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-12rem)] pr-4">
+            <ScrollArea className="flex-1 overflow-y-auto pr-4">
               <div className="space-y-1">
                 {(() => {
                   const tree = buildTree(traceSpans);
@@ -267,8 +267,8 @@ export function BotTracesTab({ botId }: { botId: string }) {
               </div>
             </ScrollArea>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

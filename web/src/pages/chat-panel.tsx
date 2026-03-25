@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 
 type MessageItem = { type: string; text?: string; file_name?: string };
@@ -103,28 +103,27 @@ export function ChatPanel({ botId, canSend: initialCanSend = true, sendDisabledR
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="flex flex-col sm:max-w-md w-full p-0 gap-0"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="flex flex-col sm:max-w-lg w-full p-0 gap-0 h-[80vh] max-h-[700px]"
       >
-        <SheetHeader className="px-6 py-4 border-b bg-muted/20">
+        <DialogHeader className="px-6 py-4 border-b bg-muted/20">
           <div className="flex items-center gap-2">
             <Terminal className="h-4 w-4 text-primary" />
-            <SheetTitle className="text-xs font-bold uppercase tracking-widest">
+            <DialogTitle className="text-xs font-bold uppercase tracking-widest">
               实时控制台
-            </SheetTitle>
+            </DialogTitle>
           </div>
-          <SheetDescription className="sr-only">
+          <DialogDescription className="sr-only">
             该账号的实时消息流
-          </SheetDescription>
+          </DialogDescription>
           <Badge
             variant="outline"
             className="bg-background text-[10px] font-bold w-fit"
           >
             实时推送
           </Badge>
-        </SheetHeader>
+        </DialogHeader>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((m) => (
@@ -175,7 +174,7 @@ export function ChatPanel({ botId, canSend: initialCanSend = true, sendDisabledR
             </Button>
           </form>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
