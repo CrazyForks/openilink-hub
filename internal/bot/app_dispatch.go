@@ -337,7 +337,7 @@ func (m *Manager) sendAppResult(inst *Instance, to string, result *appdelivery.D
 	contextToken := m.store.GetLatestContextToken(inst.DBID)
 
 	switch result.ReplyType {
-	case "image", "video", "file":
+	case "image", "video", "file", "voice":
 		span := tracer.StartChild(rootSpan, "send_reply", store.SpanKindClient, map[string]any{
 			"reply.type": result.ReplyType,
 			"reply.to":   to,

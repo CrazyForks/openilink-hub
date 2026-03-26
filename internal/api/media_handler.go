@@ -103,6 +103,12 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ct := http.DetectContentType(data)
+	// Only allow safe content types to be rendered inline; everything else
+	// is forced to download to prevent same-origin script execution (e.g. HTML/SVG).
+	safe := strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "audio/") || strings.HasPrefix(ct, "video/")
+	if !safe {
+		w.Header().Set("Content-Disposition", "attachment")
+	}
 	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	w.Write(data)
