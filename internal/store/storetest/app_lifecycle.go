@@ -105,7 +105,7 @@ func TestAppLifecycle(t *testing.T, s store.Store) {
 	})
 
 	t.Run("CreateAppWithConfigSchema", func(t *testing.T) {
-		configSchema := json.RawMessage(`{"type":"object","properties":{"forward_url":{"type":"string"}}}`)
+		configSchema := `{"type":"object","properties":{"forward_url":{"type":"string"}}}`
 		app, err := s.CreateApp(&store.App{
 			OwnerID:      u.ID,
 			Name:         "Config Schema App",
@@ -124,7 +124,7 @@ func TestAppLifecycle(t *testing.T, s store.Store) {
 			t.Errorf("config_schema should be set, got %q", string(got.ConfigSchema))
 		}
 		var parsed map[string]any
-		if err := json.Unmarshal(got.ConfigSchema, &parsed); err != nil {
+		if err := json.Unmarshal([]byte(got.ConfigSchema), &parsed); err != nil {
 			t.Fatalf("unmarshal config_schema: %v", err)
 		}
 		if parsed["type"] != "object" {

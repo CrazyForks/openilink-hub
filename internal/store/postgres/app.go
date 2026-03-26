@@ -33,8 +33,8 @@ func (db *DB) CreateApp(app *store.App) (*store.App, error) {
 	if app.Listing == "" {
 		app.Listing = "unlisted"
 	}
-	if app.ConfigSchema == nil {
-		app.ConfigSchema = json.RawMessage("{}")
+	if app.ConfigSchema == "" {
+		app.ConfigSchema = "{}"
 	}
 	err := db.QueryRow(`INSERT INTO apps (id, owner_id, name, slug, description, icon, icon_url, homepage,
 		tools, events, scopes, oauth_setup_url, oauth_redirect_url,

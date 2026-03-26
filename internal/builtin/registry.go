@@ -70,7 +70,7 @@ func SeedApps(s store.Store) error {
 				Scopes:       scopes,
 				Events:       events,
 				Tools:        tools,
-				ConfigSchema: m.ConfigSchema,
+				ConfigSchema: string(m.ConfigSchema),
 				Registry:     "builtin",
 				Listing:      "listed",
 			})

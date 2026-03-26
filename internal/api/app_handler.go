@@ -40,7 +40,7 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		Scopes           json.RawMessage `json:"scopes"`
 		Readme           string          `json:"readme"`
 		Guide            string          `json:"guide"`
-		ConfigSchema     json.RawMessage `json:"config_schema"`
+		ConfigSchema     string `json:"config_schema"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
