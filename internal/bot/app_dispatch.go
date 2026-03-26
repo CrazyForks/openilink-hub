@@ -2,12 +2,14 @@ package bot
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -340,8 +342,11 @@ func (m *Manager) sendAppResult(inst *Instance, to string, result *appdelivery.D
 			"reply.type": result.ReplyType,
 			"reply.to":   to,
 		})
-		m.sendAppMedia(ctx, inst, to, contextToken, result)
+		mediaKey := m.sendAppMedia(ctx, inst, to, contextToken, result)
 		span.SetAttr("reply.content", result.ReplyName)
+		if mediaKey != "" {
+			span.SetAttr("reply.media_key", mediaKey)
+		}
 		span.End()
 	default:
 		if result.Reply == "" {
@@ -373,7 +378,7 @@ func (m *Manager) sendAppText(ctx context.Context, inst *Instance, to, contextTo
 	})
 }
 
-func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextToken string, result *appdelivery.DeliveryResult) {
+func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextToken string, result *appdelivery.DeliveryResult) string {
 	var data []byte
 	var err error
 
@@ -389,7 +394,7 @@ func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextT
 			if result.Reply != "" {
 				m.sendAppText(ctx, inst, to, contextToken, result.Reply)
 			}
-			return
+			return ""
 		}
 	} else if result.ReplyURL != "" {
 		// Download media from URL
@@ -399,19 +404,19 @@ func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextT
 		req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, result.ReplyURL, nil)
 		if err != nil {
 			slog.Error("app media download: bad url", "url", result.ReplyURL, "err", err)
-			return
+			return ""
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			slog.Error("app media download failed", "url", result.ReplyURL, "err", err)
-			return
+			return ""
 		}
 		defer resp.Body.Close()
 
 		data, err = io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024)) // 20MB max
 		if err != nil {
 			slog.Error("app media read failed", "err", err)
-			return
+			return ""
 		}
 		// Extract filename from Content-Type if not provided
 		if result.ReplyName == "" {
@@ -426,7 +431,7 @@ func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextT
 		if result.Reply != "" {
 			m.sendAppText(ctx, inst, to, contextToken, result.Reply)
 		}
-		return
+		return ""
 	}
 
 	fileName := result.ReplyName
@@ -455,15 +460,38 @@ func (m *Manager) sendAppMedia(ctx context.Context, inst *Instance, to, contextT
 	})
 	if err != nil {
 		slog.Error("app media send failed", "bot", inst.DBID, "to", to, "err", err)
-		return
+		return ""
 	}
 	slog.Info("app media sent", "bot", inst.DBID, "to", to, "type", result.ReplyType, "size", len(data), "client_id", clientID)
+
+	mediaStatus := ""
+	mediaKeys := json.RawMessage(`{}`)
+	storageKey := ""
+	if len(data) > 0 && m.storage != nil {
+		ct := detectOutboundContentType(result.ReplyType)
+		ext := detectOutboundExt(fileName, result.ReplyType)
+		now := time.Now()
+		var rnd [4]byte
+		rand.Read(rnd[:])
+		key := fmt.Sprintf("%s/%s/out_%d_%x%s", inst.DBID,
+			now.Format("2006/01/02"), now.UnixMilli(), rnd, ext)
+		if _, err := m.storage.Put(ctx, key, ct, data); err == nil {
+			mediaStatus = "ready"
+			mediaKeys, _ = json.Marshal(map[string]string{"0": key})
+			storageKey = key
+		} else {
+			slog.Warn("app media: objectstore put failed", "key", key, "err", err)
+		}
+	}
 
 	itemType := result.ReplyType
 	itemList, _ := json.Marshal([]map[string]any{{"type": itemType, "file_name": fileName}})
 	m.store.SaveMessage(&store.Message{
 		BotID: inst.DBID, Direction: "outbound", ToUserID: to, MessageType: 2, ItemList: itemList,
+		MediaStatus: mediaStatus, MediaKeys: mediaKeys,
 	})
+
+	return storageKey
 }
 
 // parseBase64 extracts pure base64 and MIME type from a string that may be
@@ -520,4 +548,33 @@ func groupInfo(msg provider.InboundMessage) any {
 		return nil
 	}
 	return map[string]any{"id": msg.GroupID, "name": msg.GroupID}
+}
+
+func detectOutboundContentType(msgType string) string {
+	switch msgType {
+	case "image":
+		return "image/jpeg"
+	case "video":
+		return "video/mp4"
+	case "voice":
+		return "audio/wav"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func detectOutboundExt(filename, msgType string) string {
+	if ext := filepath.Ext(filename); ext != "" {
+		return ext
+	}
+	switch msgType {
+	case "image":
+		return ".jpg"
+	case "video":
+		return ".mp4"
+	case "voice":
+		return ".wav"
+	default:
+		return ""
+	}
 }
