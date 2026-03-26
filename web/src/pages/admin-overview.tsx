@@ -61,7 +61,7 @@ export function AdminOverviewPage() {
           {[
             { label: "全站用户", value: stats?.total_users || 0, icon: Users, color: "text-blue-500" },
             { label: "微信账号", value: stats?.total_bots || 0, icon: Cpu, color: "text-green-500" },
-            { label: "转发规则", value: stats?.total_channels || 0, icon: Globe, color: "text-purple-500" },
+            { label: "已安装应用", value: stats?.total_installations || 0, icon: Globe, color: "text-purple-500" },
             { label: "活跃 App", value: stats?.total_apps || 0, icon: Blocks, color: "text-orange-500" },
           ].map((m, i) => (
             <Card key={i} className="border-border/50 bg-card/50">

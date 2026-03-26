@@ -2,14 +2,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowUpRight,
-  Cable,
   Trash2,
   Bot as BotIcon,
   Cpu,
   Unplug,
   MessageSquare,
   Activity,
-  AlertTriangle,
   Blocks,
   Download,
   RefreshCw,
@@ -37,9 +35,7 @@ export function BotDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const showChannels = location.pathname.endsWith("/channels");
   const [bot, setBot] = useState<any>(null);
-  const [channels, setChannels] = useState<any[]>([]);
   const [installations, setInstallations] = useState<any[]>([]);
   const [builtinApps, setBuiltinApps] = useState<any[]>([]);
   const [listedApps, setListedApps] = useState<any[]>([]);
@@ -55,8 +51,6 @@ export function BotDetailPage() {
       const target = (bots || []).find((b: any) => b.id === id);
       if (!target) throw new Error("Instance not found");
       setBot(target);
-      const chs = await api.listChannels(id!);
-      setChannels(chs || []);
     } catch (e: any) {
       toast({ variant: "destructive", title: "加载失败", description: e.message });
     } finally {
@@ -162,11 +156,6 @@ export function BotDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-           <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs gap-1.5" onClick={() => navigate(`/dashboard/accounts/${id}/channels`)}>
-             <Cable className="h-3.5 w-3.5" />
-             转发规则
-           </Button>
-           <Separator orientation="vertical" className="h-5" />
            <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs gap-1.5" onClick={() => navigate(`/dashboard/accounts/${id}/console`)}>
              <MessageSquare className="h-3.5 w-3.5" />
              消息控制台
@@ -198,97 +187,8 @@ export function BotDetailPage() {
         </div>
       </div>
 
-      {/* Migration Banner */}
-      {channels.length > 0 && !showChannels && (
-        <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl">
-          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-              你有 {channels.length} 个转发规则尚未迁移为 Bridge App
-            </p>
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-              点击下方转发规则，将自动跳转到 Bridge App 安装页面并预填配置。
-            </p>
-          </div>
-          <Button variant="outline" size="sm" className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300" onClick={() => navigate(`/dashboard/accounts/${id}/channels`)}>
-            查看转发规则
-          </Button>
-        </div>
-      )}
-
-      {/* Channels View (migration) */}
-      {showChannels && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">转发规则</h3>
-            <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs" onClick={() => navigate(`/dashboard/accounts/${id}`)}>
-              返回概览
-            </Button>
-          </div>
-          {channels.length === 0 ? (
-            <div className="text-center py-16 space-y-3 border-2 border-dashed rounded-2xl">
-              <Cable className="w-10 h-10 mx-auto text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">暂无转发规则</p>
-            </div>
-          ) : (() => {
-            const bridgeApp = builtinApps.find((a: any) => a.slug === "bridge");
-            const bridgeLoading = marketplaceLoading;
-            const handleMigrate = (ch: any) => {
-              if (bridgeLoading) return;
-              if (!bridgeApp) {
-                toast({ variant: "destructive", title: "未找到 Bridge App", description: "请确认 Bridge App 已注册。" });
-                return;
-              }
-              const params = new URLSearchParams();
-              if (ch.handle) params.set("handle", ch.handle);
-              if (ch.webhook_config?.url) params.set("config.forward_url", ch.webhook_config.url);
-              navigate(`/dashboard/accounts/${id}/install/${bridgeApp.id}?${params.toString()}`);
-            };
-            return (
-              <div className="space-y-4">
-                <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300">
-                  迁移完成后，请手动删除旧的转发规则以避免重复转发。如果转发规则配置了认证或脚本，需要在安装后手动配置。
-                </div>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {channels.map((ch) => (
-                    <Card
-                      key={ch.id}
-                      className={`group relative border-border/50 bg-card/50 rounded-2xl transition-all hover:shadow-xl hover:border-primary/20 ${bridgeLoading ? "opacity-50" : "cursor-pointer"}`}
-                      onClick={() => handleMigrate(ch)}
-                    >
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                            <Cable className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant={ch.enabled ? "default" : "secondary"} className="h-5 rounded-full text-xs font-bold">
-                              {ch.enabled ? "运行中" : "已停用"}
-                            </Badge>
-                            <Badge variant="outline" className="h-5 rounded-full text-xs font-bold">待迁移</Badge>
-                          </div>
-                        </div>
-                        <CardTitle className="text-lg font-bold mt-4">{ch.name}</CardTitle>
-                        <p className="text-xs font-mono text-muted-foreground">@{ch.handle || "默认"}</p>
-                        {ch.webhook_config?.url && (
-                          <p className="text-xs text-muted-foreground truncate">{ch.webhook_config.url}</p>
-                        )}
-                      </CardHeader>
-                      <CardFooter className="bg-muted/30 pt-3 flex justify-between items-center px-6">
-                        <span className="text-xs text-muted-foreground">点击迁移到 Bridge App</span>
-                        <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-all" />
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* Installed Apps + Marketplace (default view) */}
-      {!showChannels && <>
+      {/* Installed Apps + Marketplace */}
+      <>
       {/* Installed Apps Section */}
       <div className="space-y-4">
         <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">已安装的应用</h3>
@@ -456,7 +356,7 @@ export function BotDetailPage() {
         )}
       </div>
 
-      </>}
+      </>
     </div>
   );
 }

@@ -65,7 +65,7 @@ export function DashboardOverviewPage() {
         {[
           { label: "在线账号", value: stats?.online_bots || 0, sub: `共 ${stats?.total_bots} 个`, icon: Bot, color: "text-blue-500" },
           { label: "消息总量", value: stats?.total_messages || 0, sub: "", icon: MessageSquare, color: "text-green-500" },
-          { label: "转发规则", value: stats?.total_channels || 0, sub: "", icon: Workflow, color: "text-purple-500" },
+          { label: "已安装应用", value: stats?.total_installations || 0, sub: "", icon: Workflow, color: "text-purple-500" },
           { label: "WebSocket 连接", value: stats?.connected_ws || 0, sub: "", icon: Wifi, color: "text-orange-500" },
         ].map((m, i) => (
           <Card key={i} className="border-border/50 bg-card/50 shadow-sm relative overflow-hidden group hover:border-primary/30 transition-all cursor-default">

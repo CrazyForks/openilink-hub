@@ -134,7 +134,6 @@ export function Layout() {
       admin: "系统管理",
       users: "用户管理",
       reviews: "审核中心",
-      channels: "转发规则",
       traces: "消息追踪",
     };
     let label = labels[segment] || segment;

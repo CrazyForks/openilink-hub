@@ -8,7 +8,7 @@ import { Layout } from "./components/layout";
 import { BotsPage } from "./pages/bots";
 import { BotDetailPage } from "./pages/bot-detail";
 import { SettingsPage } from "./pages/settings";
-import { ChannelDetailPage } from "./pages/channel-detail";
+
 import { AdminOverviewPage } from "./pages/admin-overview";
 import { AdminUsersPage } from "./pages/admin-users";
 import { AdminReviewsPage } from "./pages/admin-reviews";
@@ -44,22 +44,11 @@ createRoot(document.getElementById("root")!).render(
               <Route path="onboarding" element={<OnboardingPage />} />
               <Route path="accounts" element={<BotsPage />} />
               <Route path="accounts/:id" element={<BotDetailPage />} />
-              <Route path="accounts/:id/channels" element={<BotDetailPage />}>
-                <Route index element={null} />
-              </Route>
-              <Route path="accounts/:id/apps/:iid" element={<InstallationDetailPage />} />
+<Route path="accounts/:id/apps/:iid" element={<InstallationDetailPage />} />
               <Route path="accounts/:id/install/:appId" element={<InstallAppPage />} />
               <Route path="accounts/:id/traces" element={<TracesPage />} />
               <Route path="accounts/:id/traces/:traceId" element={<TraceDetailPage />} />
               <Route path="accounts/:id/console" element={<ConsolePage />} />
-              <Route path="accounts/:id/channel/:cid" element={<ChannelDetailPage />}>
-                <Route index element={<Navigate to="overview" replace />} />
-                <Route path="overview" element={null} />
-                <Route path="webhook" element={null} />
-                <Route path="ai" element={null} />
-                <Route path="filter" element={null} />
-                <Route path="logs" element={null} />
-              </Route>
 
               {/* Apps */}
               <Route path="apps" element={<AppsPage />} />
