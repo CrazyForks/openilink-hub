@@ -25,14 +25,19 @@ func TestStripMarkdown(t *testing.T) {
 		{"unordered list", "- item", "item"},
 		{"numbered list", "1. item", "item"},
 		{"plain text unchanged", "hello world", "hello world"},
-		// Underscore in identifiers must not be mangled
+		// Identifiers with underscores must not be mangled
 		{"snake_case preserved", "use set_config_value here", "use set_config_value here"},
 		{"env var preserved", "set ENV_VAR_NAME=1", "set ENV_VAR_NAME=1"},
-		{"dunder in prose stripped (valid bold)", "call __init__ method", "call init method"},
-		// Horizontal rule handled by reSetext
+		// __dunder__ surrounded by spaces is valid Markdown bold and is stripped
+		{"dunder in prose stripped", "call __init__ method", "call init method"},
+		// Horizontal rule and setext heading
 		{"horizontal rule", "---", ""},
-		// Setext heading underline
 		{"setext heading", "Title\n---", "Title\n"},
+		// Spaces adjacent to italic markers must be preserved
+		{"italic spaces preserved", "Use _italic_ here", "Use italic here"},
+		{"consecutive italic", "a _foo_ and _bar_ b", "a foo and bar b"},
+		{"italic at start", "_start_ of line", "start of line"},
+		{"italic at end", "end of _line_", "end of line"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -5,9 +5,12 @@ import "regexp"
 var (
 	reCodeBlock  = regexp.MustCompile("(?s)```.*?```")
 	reBold1      = regexp.MustCompile(`\*\*([^*]+)\*\*`)
-	reBold2      = regexp.MustCompile(`(?:^|[^a-zA-Z0-9])__([^_\n]+)__(?:[^a-zA-Z0-9]|$)`)
+	// reBold2 captures surrounding non-alnum boundary chars so they are restored in replacement,
+	// preventing the pattern from eating adjacent spaces or mangling __dunder__ identifiers.
+	reBold2      = regexp.MustCompile(`([^a-zA-Z0-9]|^)__([^_\n]+)__([^a-zA-Z0-9]|$)`)
 	reItalic1    = regexp.MustCompile(`\*([^*]+)\*`)
-	reItalic2    = regexp.MustCompile(`(?:^|[^a-zA-Z0-9])_([^_\n]+)_(?:[^a-zA-Z0-9]|$)`)
+	// reItalic2 uses the same boundary-preserving technique to avoid mangling snake_case.
+	reItalic2    = regexp.MustCompile(`([^a-zA-Z0-9]|^)_([^_\n]+)_([^a-zA-Z0-9]|$)`)
 	reStrike     = regexp.MustCompile(`~~(.*?)~~`)
 	reInlineCode = regexp.MustCompile("`([^`]+)`")
 	reAtxHeader  = regexp.MustCompile(`(?m)^#{1,6}\s+(.+?)\s*#*$`)
@@ -24,9 +27,9 @@ var (
 func StripMarkdown(s string) string {
 	s = reCodeBlock.ReplaceAllString(s, "")
 	s = reBold1.ReplaceAllString(s, "$1")
-	s = reBold2.ReplaceAllString(s, "$1")
+	s = reBold2.ReplaceAllString(s, "${1}${2}${3}") // $1 and $3 restore boundary chars
 	s = reItalic1.ReplaceAllString(s, "$1")
-	s = reItalic2.ReplaceAllString(s, "$1")
+	s = reItalic2.ReplaceAllString(s, "${1}${2}${3}") // $1 and $3 restore boundary chars
 	s = reStrike.ReplaceAllString(s, "$1")
 	s = reInlineCode.ReplaceAllString(s, "$1")
 	s = reAtxHeader.ReplaceAllString(s, "$1")
