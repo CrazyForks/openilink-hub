@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Bot,
@@ -52,7 +52,6 @@ const QUICK_LINKS = [
 export function DashboardOverviewPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     api
@@ -92,20 +91,13 @@ export function DashboardOverviewPage() {
           <p className="text-sm text-muted-foreground mt-0.5">查看账号状态和消息统计。</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 px-4 font-medium"
-            onClick={() => navigate("/dashboard/accounts")}
-          >
-            账号管理
+          <Button variant="outline" size="sm" className="h-9 px-4 font-medium" asChild>
+            <Link to="/dashboard/accounts">账号管理</Link>
           </Button>
-          <Button
-            size="sm"
-            className="h-9 px-4 gap-1.5 font-medium shadow-sm"
-            onClick={() => navigate("/dashboard/accounts")}
-          >
-            <Plus className="h-3.5 w-3.5" /> 添加账号
+          <Button size="sm" className="h-9 px-4 gap-1.5 font-medium shadow-sm" asChild>
+            <Link to="/dashboard/accounts">
+              <Plus className="h-3.5 w-3.5" /> 添加账号
+            </Link>
           </Button>
         </div>
       </div>
@@ -121,6 +113,7 @@ export function DashboardOverviewPage() {
             color: "text-blue-500",
             bg: "bg-blue-500/10",
             badge: (stats?.online_bots ?? 0) > 0,
+            link: "/dashboard/accounts",
           },
           {
             label: "消息总量",
@@ -130,6 +123,7 @@ export function DashboardOverviewPage() {
             color: "text-emerald-500",
             bg: "bg-emerald-500/10",
             badge: false,
+            link: null,
           },
           {
             label: "已安装应用",
@@ -139,6 +133,7 @@ export function DashboardOverviewPage() {
             color: "text-violet-500",
             bg: "bg-violet-500/10",
             badge: false,
+            link: null,
           },
           {
             label: "WebSocket 连接",
@@ -148,36 +143,61 @@ export function DashboardOverviewPage() {
             color: "text-orange-500",
             bg: "bg-orange-500/10",
             badge: false,
+            link: null,
           },
         ].map((m, i) => (
           <Card
             key={i}
-            className="border-border/50 bg-card/50 hover:bg-card transition-colors cursor-default"
+            className={`border-border/50 bg-card/50 hover:bg-card transition-colors${m.link ? " cursor-pointer" : " cursor-default"}`}
+            {...(m.link ? { onClick: undefined } : {})}
           >
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div
-                  className={`h-8 w-8 rounded-lg ${m.bg} flex items-center justify-center ${m.color}`}
-                >
-                  <m.icon className="h-4 w-4" />
-                </div>
-                {m.badge ? (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] h-5 px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
+            {m.link ? (
+              <Link to={m.link} className="block">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div
+                      className={`h-8 w-8 rounded-lg ${m.bg} flex items-center justify-center ${m.color}`}
+                    >
+                      <m.icon className="h-4 w-4" />
+                    </div>
+                    {m.badge ? (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] h-5 px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
+                      >
+                        在线
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-2xl font-bold tabular-nums">
+                      {m.value.toLocaleString()}
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <p className="text-xs font-semibold text-foreground/80">{m.label}</p>
+                      <span className="text-[10px] text-muted-foreground">{m.sub}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Link>
+            ) : (
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div
+                    className={`h-8 w-8 rounded-lg ${m.bg} flex items-center justify-center ${m.color}`}
                   >
-                    在线
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="space-y-0.5">
-                <div className="text-2xl font-bold tabular-nums">{m.value.toLocaleString()}</div>
-                <div className="flex items-baseline gap-1.5">
-                  <p className="text-xs font-semibold text-foreground/80">{m.label}</p>
-                  <span className="text-[10px] text-muted-foreground">{m.sub}</span>
+                    <m.icon className="h-4 w-4" />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
+                <div className="space-y-0.5">
+                  <div className="text-2xl font-bold tabular-nums">{m.value.toLocaleString()}</div>
+                  <div className="flex items-baseline gap-1.5">
+                    <p className="text-xs font-semibold text-foreground/80">{m.label}</p>
+                    <span className="text-[10px] text-muted-foreground">{m.sub}</span>
+                  </div>
+                </div>
+              </CardContent>
+            )}
           </Card>
         ))}
       </div>
@@ -191,13 +211,8 @@ export function DashboardOverviewPage() {
               还没有在线的微信账号，请先添加一个。
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="destructive"
-            className="shrink-0 h-8 px-3 text-xs"
-            onClick={() => navigate("/dashboard/accounts")}
-          >
-            立即添加
+          <Button size="sm" variant="destructive" className="shrink-0 h-8 px-3 text-xs" asChild>
+            <Link to="/dashboard/accounts">立即添加</Link>
           </Button>
         </div>
       ) : null}
