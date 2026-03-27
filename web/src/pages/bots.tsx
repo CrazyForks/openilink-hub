@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import QRCode from "qrcode";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardFooter } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
 import {
   Plus,
   Trash2,
@@ -241,7 +241,7 @@ function BotInstanceCard({
   }
 
   return (
-    <Card className="group flex flex-col border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200">
+    <Card className="group flex flex-col border-border/50 hover:border-primary/20 hover:shadow-lg transition-all duration-200">
       <CardContent className="p-5 flex-1 space-y-4">
         {/* Header row */}
         <div className="flex items-start justify-between gap-2">
@@ -255,7 +255,7 @@ function BotInstanceCard({
             </div>
             <div className="min-w-0">
               <p className="font-semibold leading-tight truncate">{bot.name}</p>
-              <div className="flex items-center gap-1.5 mt-1">
+              <div className="flex items-center gap-1.5 mt-0.5">
                 <span
                   className={`size-1.5 rounded-full shrink-0 ${status.dot} ${isOnline ? "animate-pulse" : ""}`}
                 />
@@ -268,7 +268,7 @@ function BotInstanceCard({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -287,14 +287,6 @@ function BotInstanceCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-
-        {/* Meta info */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Cpu className="h-3 w-3 shrink-0" />
-          <span className="capitalize">{bot.provider || "未知平台"}</span>
-          <span className="text-border mx-0.5">·</span>
-          <span className="font-mono">{bot.id.slice(0, 8)}</span>
         </div>
 
         {/* Stats row */}
@@ -323,7 +315,7 @@ function BotInstanceCard({
                 <Button
                   variant="link"
                   size="xs"
-                  className="h-auto p-0 text-destructive text-xs underline"
+                  className="h-auto p-0 text-destructive text-xs"
                   onClick={onRebind}
                 >
                   或重新扫码绑定
@@ -334,14 +326,22 @@ function BotInstanceCard({
         ) : null}
       </CardContent>
 
-      <CardFooter className="px-5 pb-5 pt-0">
-        <Button size="sm" className="w-full gap-1.5" asChild>
-          <Link to={`/dashboard/accounts/${bot.id}`}>
-            查看详情
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
-      </CardFooter>
+      {/* Slim footer: meta info + navigate link */}
+      <div className="mx-5 mb-5 pt-3 border-t border-border/40 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+          <Cpu className="h-3 w-3 shrink-0" />
+          <span className="capitalize">{bot.provider || "未知"}</span>
+          <span className="mx-0.5 opacity-40">·</span>
+          <span className="font-mono">{bot.id.slice(0, 8)}</span>
+        </div>
+        <Link
+          to={`/dashboard/accounts/${bot.id}`}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors group/link"
+        >
+          <span>查看详情</span>
+          <ArrowUpRight className="h-3 w-3 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform duration-200" />
+        </Link>
+      </div>
     </Card>
   );
 }

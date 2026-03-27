@@ -18,6 +18,7 @@ import {
   MonitorDot,
   Puzzle,
   Circle,
+  House,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useTheme } from "../lib/theme";
@@ -97,7 +98,9 @@ function LayoutHeader() {
   const location = useLocation();
   const { resolvedTheme, setTheme } = useTheme();
 
-  const pathSegments = location.pathname.split("/").filter((s) => Boolean(s) && s !== "dashboard");
+  const pathSegments = location.pathname
+    .split("/")
+    .filter((s) => Boolean(s) && s !== "dashboard" && s !== "overview");
   const breadcrumbs = pathSegments.map((segment: string, index: number) => {
     const path = `/dashboard/${pathSegments.slice(0, index + 1).join("/")}`;
     let label = BREADCRUMB_LABELS[segment] || segment;
@@ -112,6 +115,17 @@ function LayoutHeader() {
         <Separator orientation="vertical" className="h-4 opacity-50" />
         <Breadcrumb>
           <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link
+                  to="/dashboard/overview"
+                  className="flex items-center text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <House className="h-3.5 w-3.5" />
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            {breadcrumbs.length > 0 && <BreadcrumbSeparator className="opacity-30" />}
             {breadcrumbs.map((bc, i) => (
               <React.Fragment key={bc.path}>
                 {i > 0 && <BreadcrumbSeparator className="hidden md:block opacity-30" />}
