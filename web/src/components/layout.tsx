@@ -58,6 +58,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import * as React from "react";
 
 function SidebarLogo() {
@@ -135,39 +137,61 @@ function LayoutHeader() {
         </Breadcrumb>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="hidden lg:flex relative items-center group">
-          <Search className="absolute left-3 size-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <input
-            aria-label="搜索"
-            placeholder="搜索..."
-            className="h-9 w-64 rounded-full bg-muted/50 border-transparent pl-9 pr-4 text-xs font-medium focus:bg-background focus:border-border transition-all outline-none"
-          />
+      <TooltipProvider>
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex relative items-center group">
+            <Search className="absolute left-3 size-3.5 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
+            <Input
+              aria-label="搜索"
+              placeholder="搜索..."
+              className="h-9 w-56 pl-9 pr-14 focus:w-72 transition-all duration-200 bg-muted/40 border-border/50"
+            />
+            <kbd className="absolute right-2.5 pointer-events-none flex h-5 items-center gap-0.5 rounded border border-border/50 bg-muted px-1.5 text-[10px] font-medium text-muted-foreground group-focus-within:hidden">
+              ⌘K
+            </kbd>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              >
+                {resolvedTheme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>切换外观主题</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
+                <a
+                  href="https://github.com/openilink/openilink-hub"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Github className="h-4 w-4" />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>GitHub 项目</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 relative">
+                <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500/20" />
+                <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border-2 border-background animate-pulse" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>活动</TooltipContent>
+          </Tooltip>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 rounded-full"
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-          aria-label="切换外观主题"
-        >
-          {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" asChild>
-          <a
-            href="https://github.com/openilink/openilink-hub"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub 项目"
-          >
-            <Github className="h-4 w-4" />
-          </a>
-        </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full relative">
-          <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500/20" />
-          <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border-2 border-background animate-pulse" />
-        </Button>
-      </div>
+      </TooltipProvider>
     </header>
   );
 }
