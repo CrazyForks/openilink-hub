@@ -307,12 +307,19 @@ func (s *Server) handleSetOIDCConfig(w http.ResponseWriter, r *http.Request) {
 		req.DisplayName = slug
 	}
 
-	// Preserve existing secret if masked value is sent back
+	// Check existing config for issuer pinning and secret preservation
 	existingRaw, _ := s.Store.GetConfig("oidc." + slug + ".config")
-	if existingRaw != "" && req.ClientSecret != "" {
+	if existingRaw != "" {
 		var existing OIDCProviderConfig
 		if json.Unmarshal([]byte(existingRaw), &existing) == nil {
-			if req.ClientSecret == maskSecret(existing.ClientSecret) {
+			// Prevent issuer change — sub is only unique within an issuer,
+			// so changing it would break existing user identity links.
+			if existing.IssuerURL != "" && existing.IssuerURL != req.IssuerURL {
+				jsonError(w, "cannot change issuer_url for existing provider; delete and recreate instead", http.StatusBadRequest)
+				return
+			}
+			// Preserve existing secret if masked value is sent back
+			if req.ClientSecret != "" && req.ClientSecret == maskSecret(existing.ClientSecret) {
 				req.ClientSecret = existing.ClientSecret
 			}
 		}
