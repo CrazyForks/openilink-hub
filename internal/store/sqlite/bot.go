@@ -200,6 +200,7 @@ func (db *DB) GetAdminStats() (*store.AdminStats, error) {
 	db.QueryRow(`SELECT COUNT(*) FROM channels`).Scan(&s.TotalChannels)
 	db.QueryRow(`SELECT COUNT(*), SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END), SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) FROM messages`).
 		Scan(&s.TotalMessages, &s.InboundMessages, &s.OutboundMessages)
+	db.QueryRow(`SELECT COUNT(*) FROM app_installations WHERE enabled = 1`).Scan(&s.TotalInstallations)
 	return s, nil
 }
 
@@ -216,6 +217,7 @@ func (db *DB) GetBotStats(userID string) (*store.BotStats, error) {
 		return nil, err
 	}
 	db.QueryRow(`SELECT COUNT(*) FROM channels WHERE bot_id IN (SELECT id FROM bots WHERE user_id = ?)`, userID).Scan(&s.TotalChannels)
+	db.QueryRow(`SELECT COUNT(*) FROM app_installations WHERE enabled = 1 AND bot_id IN (SELECT id FROM bots WHERE user_id = ?)`, userID).Scan(&s.TotalInstallations)
 	return s, nil
 }
 
