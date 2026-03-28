@@ -350,10 +350,10 @@ function ChangePasswordSection({ hasPassword }: { hasPassword?: boolean }) {
             <Button
               type="submit"
               className="w-full sm:w-fit"
-              disabled={saving || !oldPwd || !newPwd}
+              disabled={saving || (hasPassword && !oldPwd) || !newPwd}
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              更新密码
+              {hasPassword ? "更新密码" : "设置密码"}
             </Button>
           </div>
         </form>
