@@ -35,16 +35,17 @@ type BotStats struct {
 }
 
 type AdminStats struct {
-	TotalUsers       int   `json:"total_users"`
-	ActiveUsers      int   `json:"active_users"`
-	TotalBots        int   `json:"total_bots"`
-	OnlineBots       int   `json:"online_bots"`
-	ExpiredBots      int   `json:"expired_bots"`
-	TotalChannels    int   `json:"total_channels"`
-	TotalMessages    int64 `json:"total_messages"`
-	InboundMessages  int64 `json:"inbound_messages"`
-	OutboundMessages int64 `json:"outbound_messages"`
-	ConnectedWS      int   `json:"connected_ws"`
+	TotalUsers         int   `json:"total_users"`
+	ActiveUsers        int   `json:"active_users"`
+	TotalBots          int   `json:"total_bots"`
+	OnlineBots         int   `json:"online_bots"`
+	ExpiredBots        int   `json:"expired_bots"`
+	TotalChannels      int   `json:"total_channels"`
+	TotalMessages      int64 `json:"total_messages"`
+	InboundMessages    int64 `json:"inbound_messages"`
+	OutboundMessages   int64 `json:"outbound_messages"`
+	TotalInstallations int   `json:"total_installations"`
+	ConnectedWS        int   `json:"connected_ws"`
 }
 
 type RecentContact struct {

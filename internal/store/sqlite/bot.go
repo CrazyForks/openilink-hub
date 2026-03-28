@@ -200,6 +200,7 @@ func (db *DB) GetAdminStats() (*store.AdminStats, error) {
 	db.QueryRow(`SELECT COUNT(*) FROM channels`).Scan(&s.TotalChannels)
 	db.QueryRow(`SELECT COUNT(*), SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END), SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) FROM messages`).
 		Scan(&s.TotalMessages, &s.InboundMessages, &s.OutboundMessages)
+	db.QueryRow(`SELECT COUNT(*) FROM app_installations WHERE enabled = 1`).Scan(&s.TotalInstallations)
 	return s, nil
 }
 
