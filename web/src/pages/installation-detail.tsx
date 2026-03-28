@@ -1,5 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import {
   ArrowLeft,
   Eye,
@@ -448,6 +450,19 @@ function TokenSection({ app, inst }: { app: any; inst: any }) {
   }
 
   const guideText = renderGuide();
+  const guideHtml = useMemo(() => {
+    if (!guideText) return "";
+    // Open links in new tab to avoid navigating away from the SPA
+    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A") {
+        node.setAttribute("target", "_blank");
+        node.setAttribute("rel", "noopener noreferrer");
+      }
+    });
+    const html = DOMPurify.sanitize(marked.parse(guideText, { async: false }));
+    DOMPurify.removeHook("afterSanitizeAttributes");
+    return html;
+  }, [guideText]);
   const showGenericGuide = !guideText && app.registry === "builtin";
   const showUsageGuide = guideText || showGenericGuide;
 
@@ -499,9 +514,24 @@ function TokenSection({ app, inst }: { app: any; inst: any }) {
             <CardTitle>使用指南</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed p-3 rounded-md bg-muted/30 border overflow-x-auto">
-              {guideText}
-            </div>
+            <div
+              className={[
+                "p-3 rounded-md bg-muted/30 border overflow-x-auto text-sm text-muted-foreground leading-relaxed",
+                "[&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2",
+                "[&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2",
+                "[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-1",
+                "[&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-1",
+                "[&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
+                "[&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:mb-2 [&_pre_code]:p-0 [&_pre_code]:bg-transparent",
+                "[&_a]:text-primary [&_a]:underline [&_a:hover]:text-primary/80",
+                "[&_table]:w-full [&_table]:border-collapse [&_table]:mb-2",
+                "[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:bg-muted",
+                "[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1",
+                "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:mb-2",
+                "[&_hr]:border-border [&_hr]:my-3",
+              ].join(" ")}
+              dangerouslySetInnerHTML={{ __html: guideHtml }}
+            />
           </CardContent>
         </Card>
       ) : null}
