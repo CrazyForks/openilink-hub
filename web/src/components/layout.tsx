@@ -87,7 +87,14 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   reviews: "审核中心",
   traces: "消息追踪",
   developer: "开发者",
+  install: "安装应用",
+  console: "控制台",
+  onboarding: "引导",
 };
+
+// Intermediate-only segments that are NOT standalone routes.
+// These are skipped in breadcrumbs when followed by a dynamic ID.
+const BREADCRUMB_SKIP = new Set(["apps", "install"]);
 
 const statusColors: Record<string, string> = {
   connected: "text-green-500 fill-green-500",
@@ -112,15 +119,23 @@ function LayoutHeader() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const pathSegments = location.pathname
+  // Build breadcrumbs from path, skipping segments that are intermediate
+  // parts of a compound route (e.g. "apps" in /accounts/:id/apps/:iid).
+  const rawSegments = location.pathname
     .split("/")
     .filter((s) => Boolean(s) && s !== "dashboard" && s !== "overview");
-  const breadcrumbs = pathSegments.map((segment: string, index: number) => {
-    const path = `/dashboard/${pathSegments.slice(0, index + 1).join("/")}`;
+  const breadcrumbs: { label: string; path: string; isLast: boolean }[] = [];
+  for (let i = 0; i < rawSegments.length; i++) {
+    const segment = rawSegments[i];
+    const path = `/dashboard/${rawSegments.slice(0, i + 1).join("/")}`;
+    // Skip intermediate-only segments (e.g. "apps" in /accounts/:id/apps/:iid)
+    if (BREADCRUMB_SKIP.has(segment) && i > 0 && i < rawSegments.length - 1) {
+      continue;
+    }
     let label = BREADCRUMB_LABELS[segment] || segment;
     if (segment.length > 20) label = "详情";
-    return { label, path, isLast: index === pathSegments.length - 1 };
-  });
+    breadcrumbs.push({ label, path, isLast: i === rawSegments.length - 1 });
+  }
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-6 sticky top-0 z-40">
@@ -142,7 +157,7 @@ function LayoutHeader() {
             {breadcrumbs.length > 0 && <BreadcrumbSeparator className="opacity-30" />}
             {breadcrumbs.map((bc, i) => (
               <React.Fragment key={bc.path}>
-                {i > 0 && <BreadcrumbSeparator className="hidden md:block opacity-30" />}
+                {i > 0 && <BreadcrumbSeparator className="opacity-30" />}
                 <BreadcrumbItem>
                   {bc.isLast ? (
                     <BreadcrumbPage className="font-bold text-foreground">
