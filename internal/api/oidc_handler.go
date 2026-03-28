@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -80,8 +81,7 @@ func discoverOIDC(ctx context.Context, issuerURL string) (authURL, tokenURL, use
 }
 
 // oidcExchangeAndIdentify exchanges the authorization code and extracts user identity.
-func (s *Server) oidcExchangeAndIdentify(cfg *OIDCProviderConfig, redirectURI, code string) (providerID, username, email, avatarURL string, err error) {
-	ctx := context.Background()
+func (s *Server) oidcExchangeAndIdentify(ctx context.Context, cfg *OIDCProviderConfig, redirectURI, code string) (providerID, username, email, avatarURL string, err error) {
 
 	scopes := strings.Fields(cfg.Scopes)
 	if len(scopes) == 0 {
@@ -230,7 +230,9 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request, prov
 	}
 
 	redirectURI := s.Config.RPOrigin + "/api/auth/oauth/" + providerName + "/callback"
-	providerID, username, email, avatarURL, err := s.oidcExchangeAndIdentify(cfg, redirectURI, code)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	providerID, username, email, avatarURL, err := s.oidcExchangeAndIdentify(ctx, cfg, redirectURI, code)
 	if err != nil {
 		slog.Error("oidc exchange failed", "provider", providerName, "err", err)
 		jsonError(w, "OIDC login failed", http.StatusBadGateway)
