@@ -52,13 +52,19 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   // OAuth
-  const [oauthProviders, setOauthProviders] = useState<string[]>([]);
+  const [oauthProviders, setOauthProviders] = useState<Array<{ name: string; display_name: string; type: string }>>([]);
 
   // Registration enabled flag (from /api/info)
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
 
   useEffect(() => {
-    api.oauthProviders().then((data) => setOauthProviders(data.providers || [])).catch(() => {});
+    api.oauthProviders().then((data) => {
+      const providers = data.providers || [];
+      // Normalize: handle both old string[] format and new object[] format
+      setOauthProviders(
+        providers.map((p: any) => typeof p === "string" ? { name: p, display_name: p, type: "oauth" } : p)
+      );
+    }).catch(() => {});
     api.info().then((data) => {
       if (data.registration_enabled === false) {
         setRegistrationEnabled(false);
@@ -282,13 +288,13 @@ export function LoginPage() {
             {oauthProviders.length > 0 && (
               <div className="space-y-2 mb-4">
                 {oauthProviders.map((provider) => {
-                  const config = providerLabels[provider] || { label: provider, icon: Shield };
+                  const config = providerLabels[provider.name] || { label: provider.display_name || provider.name, icon: Shield };
                   return (
                     <Button
-                      key={provider}
+                      key={provider.name}
                       variant="outline"
                       className="w-full h-9 gap-2 font-medium text-sm"
-                      onClick={() => (window.location.href = `/api/auth/oauth/${provider}`)}
+                      onClick={() => (window.location.href = `/api/auth/oauth/${provider.name}`)}
                     >
                       <config.icon className="h-4 w-4" />
                       使用 {config.label} 登录

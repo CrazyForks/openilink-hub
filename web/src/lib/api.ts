@@ -51,7 +51,7 @@ export const api = {
   login: (username: string, password: string) =>
     request("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
-  oauthProviders: () => request<{ providers: string[] }>("/api/auth/oauth/providers"),
+  oauthProviders: () => request<{ providers: Array<{ name: string; display_name: string; type: string }> }>("/api/auth/oauth/providers"),
   me: () =>
     request<{ id: string; username: string; display_name: string; role: string }>("/api/me"),
   info: () => request<{ ai: boolean; registration_enabled: boolean }>("/api/info"),
@@ -141,6 +141,13 @@ export const api = {
     request(`/api/admin/config/oauth/${provider}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteOAuthConfig: (provider: string) =>
     request(`/api/admin/config/oauth/${provider}`, { method: "DELETE" }),
+
+  // Admin: OIDC config
+  getOIDCConfig: () => request<any[]>("/api/admin/config/oidc"),
+  setOIDCConfig: (slug: string, data: { display_name: string; issuer_url: string; client_id: string; client_secret: string; scopes?: string }) =>
+    request(`/api/admin/config/oidc/${slug}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteOIDCConfig: (slug: string) =>
+    request(`/api/admin/config/oidc/${slug}`, { method: "DELETE" }),
 
   // Public: available models list (all authenticated users)
   getAvailableModels: () => request<string[]>("/api/config/ai/available_models"),
