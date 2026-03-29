@@ -63,7 +63,11 @@ func (f *FSStore) Get(_ context.Context, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return os.ReadFile(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("storage: fs get %s: %w", key, err)
+	}
+	return data, nil
 }
 
 func (f *FSStore) URL(key string) string {

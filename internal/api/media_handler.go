@@ -67,12 +67,15 @@ func (s *Server) serveChannelMedia(w http.ResponseWriter, r *http.Request, inst 
 		return
 	}
 
-	ct := r.URL.Query().Get("ct")
-	if ct == "" {
-		ct = http.DetectContentType(data)
+	ct := http.DetectContentType(data)
+	safe := (strings.HasPrefix(ct, "image/") && ct != "image/svg+xml") ||
+		strings.HasPrefix(ct, "audio/") || strings.HasPrefix(ct, "video/")
+	if !safe {
+		w.Header().Set("Content-Disposition", "attachment")
 	}
 	w.Header().Set("Content-Type", ct)
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=86400")
 	w.Write(data)
 }
 
