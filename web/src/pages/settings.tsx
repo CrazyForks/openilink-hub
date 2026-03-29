@@ -42,7 +42,7 @@ export function SettingsPage() {
   const location = useLocation();
   const [user, setUser] = useState<any>(null);
   const [oauthAccounts, setOauthAccounts] = useState<any[]>([]);
-  const [oauthProviders, setOauthProviders] = useState<string[]>([]);
+  const [oauthProviders, setOauthProviders] = useState<Array<{ name: string; display_name: string; type: string }>>([]);
   const [loading, setLoading] = useState(true);
   const { theme, setTheme } = useTheme();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -59,7 +59,7 @@ export function SettingsPage() {
       ]);
       setUser(u);
       setOauthAccounts(accounts || []);
-      setOauthProviders(providers.providers || []);
+      setOauthProviders(providers.providers);
     } finally {
       setLoading(false);
     }
@@ -154,12 +154,13 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {oauthProviders.map((provider) => {
-                  const account = oauthAccounts.find((a) => a.provider === provider);
+                  const account = oauthAccounts.find((a) => a.provider === provider.name);
                   const linked = !!account;
-                  const Icon = providerLabels[provider]?.icon || ShieldCheck;
+                  const Icon = providerLabels[provider.name]?.icon || ShieldCheck;
+                  const label = providerLabels[provider.name]?.label || provider.display_name || provider.name;
                   return (
                     <div
-                      key={provider}
+                      key={provider.name}
                       className="flex items-center justify-between p-4 rounded-xl border bg-muted/10"
                     >
                       {" "}
@@ -169,7 +170,7 @@ export function SettingsPage() {
                         </div>
                         <div>
                           <p className="text-sm font-bold uppercase">
-                            {providerLabels[provider]?.label || provider}
+                            {label}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {linked ? `已关联：${account.username}` : "未连接"}
@@ -184,13 +185,13 @@ export function SettingsPage() {
                           onClick={async () => {
                             const ok = await confirm({
                               title: "解绑确认",
-                              description: `确定要解绑 ${providerLabels[provider]?.label || provider}？`,
+                              description: `确定要解绑 ${label}？`,
                               confirmText: "解绑",
                               variant: "destructive",
                             });
                             if (!ok) return;
                             try {
-                              await api.unlinkOAuth(provider);
+                              await api.unlinkOAuth(provider.name);
                               load();
                             } catch (e: any) {
                               setOauthMsg(e.message);
@@ -204,7 +205,7 @@ export function SettingsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() =>
-                            (window.location.href = `/api/me/linked-accounts/${provider}/bind`)
+                            (window.location.href = `/api/me/linked-accounts/${provider.name}/bind`)
                           }
                         >
                           <Link2 className="h-3.5 w-3.5 mr-2" /> 绑定

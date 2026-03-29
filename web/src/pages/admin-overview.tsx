@@ -10,6 +10,8 @@ import {
   Trash2,
   Plus,
   UserPlus,
+  KeyRound,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,6 +169,8 @@ export function AdminOverviewPage() {
       </Card>
 
       <RegistrationConfigCard />
+
+      <OIDCConfigCard />
 
       <div className="grid gap-8 md:grid-cols-2">
         <Card className="border-border/50 bg-card/50">
@@ -507,6 +511,175 @@ function RegistryConfigCard() {
               <Plus className="w-3.5 h-3.5 mr-1" /> 添加
             </Button>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OIDCConfigCard() {
+  const [providers, setProviders] = useState<any[]>([]);
+  const [slug, setSlug] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [issuerUrl, setIssuerUrl] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [scopes, setScopes] = useState("");
+  const [adding, setAdding] = useState(false);
+  const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
+
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  async function loadProviders() {
+    try {
+      const data = await api.getOIDCConfig();
+      setProviders(data || []);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "加载 OIDC 配置失败", description: e.message });
+    }
+  }
+
+  async function handleAdd() {
+    const normalizedSlug = slug.trim();
+    if (!normalizedSlug || !issuerUrl.trim() || !clientId.trim()) return;
+    if (providers.some((p) => p.slug === normalizedSlug)) {
+      toast({ variant: "destructive", title: "Slug 已存在", description: "请先删除再重新创建。" });
+      return;
+    }
+    setAdding(true);
+    try {
+      await api.setOIDCConfig(normalizedSlug, {
+        display_name: displayName.trim() || normalizedSlug,
+        issuer_url: issuerUrl.trim(),
+        client_id: clientId.trim(),
+        client_secret: clientSecret.trim(),
+        scopes: scopes.trim(),
+      });
+      setSlug("");
+      setDisplayName("");
+      setIssuerUrl("");
+      setClientId("");
+      setClientSecret("");
+      setScopes("");
+      await loadProviders();
+      toast({ title: "OIDC 提供商已添加" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "添加失败", description: e.message });
+    }
+    setAdding(false);
+  }
+
+  async function handleDelete(s: string, name: string) {
+    const ok = await confirm({
+      title: "删除确认",
+      description: `确定删除 OIDC 提供商 "${name}"？`,
+      confirmText: "删除",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    try {
+      await api.deleteOIDCConfig(s);
+      await loadProviders();
+      toast({ title: "已删除" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "删除失败", description: e.message });
+    }
+  }
+
+  return (
+    <Card className="border-border/50 bg-card/50">
+      {ConfirmDialog}
+      <CardHeader>
+        <CardTitle>OIDC 身份提供商</CardTitle>
+        <CardDescription>
+          添加自定义 OIDC 身份提供商（如 Pocket-ID、Keycloak、Authentik 等），用户可通过这些服务登录。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Existing providers */}
+        {providers.length > 0 && (
+          <div className="space-y-2">
+            {providers.map((p) => (
+              <div
+                key={p.slug}
+                className="flex items-center justify-between p-3 rounded-lg border bg-background"
+              >
+                <div className="min-w-0 flex items-center gap-3">
+                  <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{p.display_name}</p>
+                    <p className="text-xs text-muted-foreground font-mono truncate">{p.issuer_url}</p>
+                  </div>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                      onClick={() => handleDelete(p.slug, p.display_name)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>删除</TooltipContent>
+                </Tooltip>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add form */}
+        <div className="space-y-3 pt-2 border-t">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            添加 OIDC 提供商
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input
+              placeholder="标识 (slug, 如 pocket-id)"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+            />
+            <Input
+              placeholder="显示名称"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+          </div>
+          <Input
+            placeholder="Issuer URL (如 https://auth.example.com)"
+            value={issuerUrl}
+            onChange={(e) => setIssuerUrl(e.target.value)}
+          />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input
+              placeholder="Client ID"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+            />
+            <Input
+              type="password"
+              placeholder="Client Secret"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+            />
+          </div>
+          <Input
+            placeholder="Scopes (默认: openid profile email)"
+            value={scopes}
+            onChange={(e) => setScopes(e.target.value)}
+          />
+          <Button
+            size="sm"
+            onClick={handleAdd}
+            disabled={adding || !slug.trim() || !issuerUrl.trim() || !clientId.trim()}
+          >
+            {adding ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+            添加
+          </Button>
         </div>
       </CardContent>
     </Card>
