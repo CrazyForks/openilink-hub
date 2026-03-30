@@ -43,8 +43,16 @@ func (s *Server) handleCreateBroadcastToken(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Deduplicate and validate bot_ids belong to user
+	// Deduplicate and validate bot_ids
 	req.BotIDs = dedupStrings(req.BotIDs)
+	if len(req.BotIDs) == 0 {
+		jsonError(w, "at least one bot_id is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.BotIDs) > 50 {
+		jsonError(w, "too many bot_ids (max 50)", http.StatusBadRequest)
+		return
+	}
 	if err := s.validateBotOwnership(userID, req.BotIDs); err != nil {
 		if _, ok := err.(*botOwnershipError); ok {
 			jsonError(w, err.Error(), http.StatusBadRequest)
@@ -96,8 +104,16 @@ func (s *Server) handleUpdateBroadcastToken(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Deduplicate and validate bot_ids belong to user
+	// Deduplicate and validate bot_ids
 	req.BotIDs = dedupStrings(req.BotIDs)
+	if len(req.BotIDs) == 0 {
+		jsonError(w, "at least one bot_id is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.BotIDs) > 50 {
+		jsonError(w, "too many bot_ids (max 50)", http.StatusBadRequest)
+		return
+	}
 	if err := s.validateBotOwnership(userID, req.BotIDs); err != nil {
 		if _, ok := err.(*botOwnershipError); ok {
 			jsonError(w, err.Error(), http.StatusBadRequest)
