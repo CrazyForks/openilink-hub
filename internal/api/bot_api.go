@@ -26,30 +26,29 @@ func generateTraceID() string {
 	return "tr_" + hex.EncodeToString(b)
 }
 
+// sendMessageRequest is the request body for POST /bot/v1/messages/send.
+type sendMessageRequest struct {
+	To       string `json:"to"`
+	Type     string `json:"type"`
+	Content  string `json:"content"`
+	URL      string `json:"url"`
+	Base64   string `json:"base64"`
+	FileName string `json:"filename"`
+	TraceID  string `json:"trace_id"`
+}
+
 // handleBotAPISend handles POST /bot/v1/messages/send.
 func (s *Server) handleBotAPISend(w http.ResponseWriter, r *http.Request) {
 	inst := installationFromContext(r.Context())
-	if inst == nil {
+	bcToken := broadcastTokenFromContext(r.Context())
+
+	if inst == nil && bcToken == nil {
 		botAPIError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Check scope
-	if !s.requireScope(inst, "message:write") {
-		botAPIError(w, "missing scope: message:write", http.StatusForbidden)
-		return
-	}
-
 	// Parse request body
-	var req struct {
-		To       string `json:"to"`
-		Type     string `json:"type"`
-		Content  string `json:"content"`
-		URL      string `json:"url"`
-		Base64   string `json:"base64"`
-		FileName string `json:"filename"`
-		TraceID  string `json:"trace_id"`
-	}
+	var req sendMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		botAPIError(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -66,6 +65,18 @@ func (s *Server) handleBotAPISend(w http.ResponseWriter, r *http.Request) {
 
 	if req.Type != "text" && req.Content == "" && req.URL == "" && req.Base64 == "" {
 		botAPIError(w, "content, url, or base64 is required", http.StatusBadRequest)
+		return
+	}
+
+	// Broadcast path
+	if bcToken != nil {
+		s.handleBroadcastSend(w, r, bcToken, &req)
+		return
+	}
+
+	// Single-bot path: check scope
+	if !s.requireScope(inst, "message:write") {
+		botAPIError(w, "missing scope: message:write", http.StatusForbidden)
 		return
 	}
 
@@ -223,6 +234,116 @@ func (s *Server) handleBotAPISend(w http.ResponseWriter, r *http.Request) {
 		"ok":        true,
 		"client_id": clientID,
 		"trace_id":  traceID,
+	})
+}
+
+// handleBroadcastSend sends a text message to multiple bots via a broadcast token.
+func (s *Server) handleBroadcastSend(w http.ResponseWriter, r *http.Request, bcToken *store.BroadcastToken, req *sendMessageRequest) {
+	// Broadcast only supports text messages
+	if req.Type != "text" {
+		botAPIError(w, "broadcast only supports text messages", http.StatusBadRequest)
+		return
+	}
+
+	// Parse bot IDs from broadcast token
+	var botIDs []string
+	if err := json.Unmarshal(bcToken.BotIDs, &botIDs); err != nil {
+		botAPIError(w, "invalid bot_ids in broadcast token", http.StatusInternalServerError)
+		return
+	}
+	if len(botIDs) == 0 {
+		botAPIError(w, "broadcast token has no bot_ids", http.StatusBadRequest)
+		return
+	}
+
+	// Generate trace ID if not provided
+	traceID := req.TraceID
+	if traceID == "" {
+		traceID = r.Header.Get("X-Trace-Id")
+	}
+	if traceID == "" {
+		traceID = generateTraceID()
+	}
+
+	type broadcastResult struct {
+		BotID    string `json:"bot_id"`
+		OK       bool   `json:"ok"`
+		ClientID string `json:"client_id,omitempty"`
+		Error    string `json:"error,omitempty"`
+	}
+
+	allOK := true
+	results := make([]broadcastResult, 0, len(botIDs))
+
+	for _, botID := range botIDs {
+		res := broadcastResult{BotID: botID}
+
+		botInst, ok := s.BotManager.GetInstance(botID)
+		if !ok {
+			res.Error = "bot not connected"
+			allOK = false
+			results = append(results, res)
+			continue
+		}
+
+		if canSend, reason := s.checkSendability(botID, botInst.Status()); !canSend {
+			res.Error = reason
+			allOK = false
+			results = append(results, res)
+			continue
+		}
+
+		contextToken := s.Store.GetLatestContextToken(botID)
+		outMsg := provider.OutboundMessage{
+			Recipient:    req.To,
+			ContextToken: contextToken,
+			Text:         req.Content,
+		}
+
+		clientID, err := botInst.Send(r.Context(), outMsg)
+		if err != nil {
+			slog.Error("broadcast: send failed", "bot_id", botID, "err", err)
+			res.Error = "send failed: " + err.Error()
+			allOK = false
+			results = append(results, res)
+			continue
+		}
+
+		res.OK = true
+		res.ClientID = clientID
+
+		// Save outbound message to DB
+		item := map[string]any{"type": "text"}
+		if outMsg.Text != "" {
+			item["text"] = outMsg.Text
+		}
+		itemList, _ := json.Marshal([]any{item})
+		s.Store.SaveMessage(&store.Message{
+			BotID:       botID,
+			Direction:   "outbound",
+			ToUserID:    req.To,
+			MessageType: 2,
+			ItemList:    itemList,
+		})
+
+		// Append span for tracing
+		spanAttrs := map[string]any{
+			"app.name":      bcToken.Name,
+			"bot.id":        botID,
+			"reply.type":    "text",
+			"reply.to":      req.To,
+			"reply.content": req.Content,
+		}
+		_ = s.Store.AppendSpan(traceID, botID, "broadcast:send", store.SpanKindServer, store.StatusOK, "", spanAttrs)
+
+		results = append(results, res)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":       allOK,
+		"results":  results,
+		"trace_id": traceID,
 	})
 }
 
