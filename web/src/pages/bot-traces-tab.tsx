@@ -21,9 +21,9 @@ export function BotTracesTab({ botId }: { botId: string }) {
   const [loading, setLoading] = useState(true);
   const fetchIdRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showLoading = false) => {
     const id = ++fetchIdRef.current;
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const data = await api.listTraces(botId, 100);
       if (fetchIdRef.current !== id) return;
@@ -37,8 +37,8 @@ export function BotTracesTab({ botId }: { botId: string }) {
   }, [botId]);
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, 5000);
+    load(true);
+    const t = setInterval(() => load(), 5000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -49,7 +49,7 @@ export function BotTracesTab({ botId }: { botId: string }) {
           <Activity className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold">消息日志</h3>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="h-8">
+        <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading} className="h-8">
           <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} /> 刷新
         </Button>
       </div>
