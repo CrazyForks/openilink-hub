@@ -309,6 +309,7 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 
 	// Create OTel-style tracer for this message
 	tracer := store.NewTracer(m.store, inst.DBID)
+	defer tracer.Flush() // ensure trace is written even on panic
 	rootSpan := tracer.Start("process_message", store.SpanKindInternal, map[string]any{
 		"message.sender":  msg.Sender,
 		"message.content": parsed.content,
@@ -353,9 +354,8 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		slog.Error("mark processed failed", "bot", inst.DBID, "msg", msgID, "err", err)
 	}
 
-	// End root span and flush all spans to DB
+	// End root span (flush handled by defer)
 	rootSpan.End()
-	tracer.Flush()
 }
 
 // parsedMessage holds extracted info from an inbound message.

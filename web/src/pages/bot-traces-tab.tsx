@@ -38,6 +38,8 @@ export function BotTracesTab({ botId }: { botId: string }) {
 
   useEffect(() => {
     load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
   }, [load]);
 
   return (
