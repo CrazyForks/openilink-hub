@@ -597,11 +597,6 @@ function PasskeySection() {
   );
 }
 
-function maskToken(token: string): string {
-  if (token.length <= 11) return token;
-  return token.slice(0, 7) + "..." + token.slice(-4);
-}
-
 function BroadcastTokenSection() {
   const { data: tokens = [] } = useBroadcastTokens();
   const { data: bots = [] } = useBots();
@@ -741,14 +736,7 @@ function BroadcastTokenSection() {
                   <div className="min-w-0">
                     <p className="text-xs font-bold truncate">{tk.name}</p>
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground uppercase font-medium mt-0.5">
-                      <span className="font-mono">{maskToken(tk.token)}</span>
-                      <button
-                        className="hover:text-foreground transition-colors"
-                        onClick={() => { navigator.clipboard.writeText(tk.token).then(() => toast({ title: "令牌已复制" })).catch(() => toast({ title: "复制失败", variant: "destructive" })); }}
-                        title="复制令牌"
-                      >
-                        <Copy className="h-2.5 w-2.5" />
-                      </button>
+                      <span className="font-mono">{tk.token}</span>
                       <span>{(tk.bot_ids || []).length} 个 Bot</span>
                       <span className="flex items-center gap-1">
                         <Clock className="h-2.5 w-2.5" />

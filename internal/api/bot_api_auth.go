@@ -65,6 +65,13 @@ func (s *Server) appTokenAuth(next http.Handler) http.Handler {
 
 		// Route by token prefix: bc_ → broadcast token, otherwise → installation token
 		if strings.HasPrefix(token, "bc_") {
+			// Broadcast tokens can only be used with the send endpoint
+			p := r.URL.Path
+			if p != "/bot/v1/message/send" && p != "/bot/v1/messages/send" {
+				botAPIError(w, "broadcast tokens can only be used with the send endpoint", http.StatusForbidden)
+				return
+			}
+
 			bcToken, err := s.Store.GetBroadcastTokenByToken(token)
 			if err != nil {
 				slog.Warn("bot api auth: broadcast token lookup failed", "err", err)

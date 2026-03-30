@@ -15,6 +15,13 @@ func (s *Server) handleListBroadcastTokens(w http.ResponseWriter, r *http.Reques
 		jsonError(w, "list failed", http.StatusInternalServerError)
 		return
 	}
+	// Mask tokens in list response — full token is only returned on create/regenerate
+	for i := range tokens {
+		t := tokens[i].Token
+		if len(t) > 11 {
+			tokens[i].Token = t[:7] + "..." + t[len(t)-4:]
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokens)
 }
