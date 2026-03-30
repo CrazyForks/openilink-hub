@@ -526,6 +526,28 @@ func (s *Store) ResolvePluginScript(string) (string, string, int, error) {
 	return "", "", 0, errNotImplemented
 }
 
+// --- BroadcastTokenStore (stub) ---
+
+func (s *Store) CreateBroadcastToken(string, string, json.RawMessage) (*store.BroadcastToken, error) {
+	return nil, errNotImplemented
+}
+func (s *Store) GetBroadcastToken(string) (*store.BroadcastToken, error) {
+	return nil, errNotImplemented
+}
+func (s *Store) GetBroadcastTokenByToken(string) (*store.BroadcastToken, error) {
+	return nil, errNotImplemented
+}
+func (s *Store) ListBroadcastTokensByUser(string) ([]store.BroadcastToken, error) {
+	return nil, errNotImplemented
+}
+func (s *Store) UpdateBroadcastToken(string, string, json.RawMessage) error {
+	return errNotImplemented
+}
+func (s *Store) DeleteBroadcastToken(string) error    { return errNotImplemented }
+func (s *Store) RegenerateBroadcastToken(string) (string, error) {
+	return "", errNotImplemented
+}
+
 // --- WebhookLogStore (stub) ---
 
 func (s *Store) CreateWebhookLog(*store.WebhookLog) (int64, error)          { return 0, nil }
