@@ -340,6 +340,11 @@ func (s *Server) handleBroadcastSend(w http.ResponseWriter, r *http.Request, bcT
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	if !allOK {
+		// Partial or full failure: use 207 Multi-Status so clients can
+		// distinguish success from failure at the HTTP level.
+		w.WriteHeader(http.StatusMultiStatus)
+	}
 	json.NewEncoder(w).Encode(map[string]any{
 		"ok":       allOK,
 		"results":  results,

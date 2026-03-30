@@ -43,7 +43,8 @@ func (s *Server) handleCreateBroadcastToken(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate bot_ids belong to user
+	// Deduplicate and validate bot_ids belong to user
+	req.BotIDs = dedupStrings(req.BotIDs)
 	if err := s.validateBotOwnership(userID, req.BotIDs); err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -91,7 +92,8 @@ func (s *Server) handleUpdateBroadcastToken(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate bot_ids belong to user
+	// Deduplicate and validate bot_ids belong to user
+	req.BotIDs = dedupStrings(req.BotIDs)
 	if err := s.validateBotOwnership(userID, req.BotIDs); err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -155,6 +157,19 @@ func (s *Server) handleRegenerateBroadcastToken(w http.ResponseWriter, r *http.R
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": newToken})
+}
+
+// dedupStrings removes duplicate strings while preserving order.
+func dedupStrings(ss []string) []string {
+	seen := make(map[string]bool, len(ss))
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // validateBotOwnership checks that all given bot IDs belong to the user.

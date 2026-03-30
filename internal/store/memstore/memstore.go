@@ -32,6 +32,10 @@ type Store struct {
 	eventLogs []store.AppEventLog
 	logSeq    atomic.Int64
 	apiLogs   []store.AppAPILog
+
+	broadcastTokens    map[string]*store.BroadcastToken // keyed by ID
+	broadcastTokenIdx  map[string]string                // token → ID
+	broadcastTokenSeq  atomic.Int64
 }
 
 // Compile-time check that Store implements store.Store.
@@ -40,11 +44,13 @@ var _ store.Store = (*Store)(nil)
 // New creates a new empty in-memory store.
 func New() *Store {
 	return &Store{
-		bots:          make(map[string]*store.Bot),
-		apps:          make(map[string]*store.App),
-		installations: make(map[string]*store.AppInstallation),
-		tokenIndex:    make(map[string]string),
-		handleIndex:   make(map[string]string),
+		bots:              make(map[string]*store.Bot),
+		apps:              make(map[string]*store.App),
+		installations:     make(map[string]*store.AppInstallation),
+		tokenIndex:        make(map[string]string),
+		handleIndex:       make(map[string]string),
+		broadcastTokens:   make(map[string]*store.BroadcastToken),
+		broadcastTokenIdx: make(map[string]string),
 	}
 }
 
@@ -526,26 +532,101 @@ func (s *Store) ResolvePluginScript(string) (string, string, int, error) {
 	return "", "", 0, errNotImplemented
 }
 
-// --- BroadcastTokenStore (stub) ---
+// --- BroadcastTokenStore (implemented) ---
 
-func (s *Store) CreateBroadcastToken(string, string, json.RawMessage) (*store.BroadcastToken, error) {
-	return nil, errNotImplemented
+func (s *Store) CreateBroadcastToken(userID, name string, botIDs json.RawMessage) (*store.BroadcastToken, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id := fmt.Sprintf("bct_%d", s.broadcastTokenSeq.Add(1))
+	token := fmt.Sprintf("bc_%d", time.Now().UnixNano())
+	bt := &store.BroadcastToken{
+		ID:        id,
+		UserID:    userID,
+		Name:      name,
+		Token:     token,
+		BotIDs:    botIDs,
+		CreatedAt: time.Now().Unix(),
+	}
+	s.broadcastTokens[id] = bt
+	s.broadcastTokenIdx[token] = id
+	cp := *bt
+	return &cp, nil
 }
-func (s *Store) GetBroadcastToken(string) (*store.BroadcastToken, error) {
-	return nil, errNotImplemented
+
+func (s *Store) GetBroadcastToken(id string) (*store.BroadcastToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	bt, ok := s.broadcastTokens[id]
+	if !ok {
+		return nil, fmt.Errorf("broadcast token %s not found", id)
+	}
+	cp := *bt
+	return &cp, nil
 }
-func (s *Store) GetBroadcastTokenByToken(string) (*store.BroadcastToken, error) {
-	return nil, errNotImplemented
+
+func (s *Store) GetBroadcastTokenByToken(token string) (*store.BroadcastToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.broadcastTokenIdx[token]
+	if !ok {
+		return nil, fmt.Errorf("broadcast token not found")
+	}
+	bt, ok := s.broadcastTokens[id]
+	if !ok {
+		return nil, fmt.Errorf("broadcast token not found")
+	}
+	cp := *bt
+	return &cp, nil
 }
-func (s *Store) ListBroadcastTokensByUser(string) ([]store.BroadcastToken, error) {
-	return nil, errNotImplemented
+
+func (s *Store) ListBroadcastTokensByUser(userID string) ([]store.BroadcastToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []store.BroadcastToken
+	for _, bt := range s.broadcastTokens {
+		if bt.UserID == userID {
+			out = append(out, *bt)
+		}
+	}
+	return out, nil
 }
-func (s *Store) UpdateBroadcastToken(string, string, json.RawMessage) error {
-	return errNotImplemented
+
+func (s *Store) UpdateBroadcastToken(id, name string, botIDs json.RawMessage) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bt, ok := s.broadcastTokens[id]
+	if !ok {
+		return fmt.Errorf("broadcast token %s not found", id)
+	}
+	bt.Name = name
+	bt.BotIDs = botIDs
+	return nil
 }
-func (s *Store) DeleteBroadcastToken(string) error    { return errNotImplemented }
-func (s *Store) RegenerateBroadcastToken(string) (string, error) {
-	return "", errNotImplemented
+
+func (s *Store) DeleteBroadcastToken(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bt, ok := s.broadcastTokens[id]
+	if !ok {
+		return nil
+	}
+	delete(s.broadcastTokenIdx, bt.Token)
+	delete(s.broadcastTokens, id)
+	return nil
+}
+
+func (s *Store) RegenerateBroadcastToken(id string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bt, ok := s.broadcastTokens[id]
+	if !ok {
+		return "", fmt.Errorf("broadcast token %s not found", id)
+	}
+	delete(s.broadcastTokenIdx, bt.Token)
+	newToken := fmt.Sprintf("bc_%d", time.Now().UnixNano())
+	bt.Token = newToken
+	s.broadcastTokenIdx[newToken] = id
+	return newToken, nil
 }
 
 // --- WebhookLogStore (stub) ---
