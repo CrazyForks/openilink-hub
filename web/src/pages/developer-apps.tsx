@@ -44,7 +44,7 @@ export function DeveloperAppsPage() {
       onSuccess: (app: any) => {
         setDialogOpen(false);
         setNewName("");
-        navigate(`/dashboard/apps/${app.id}`);
+        navigate(`/dashboard/developer/apps/${app.id}`);
       },
       onError: (e) => toast({ variant: "destructive", title: "创建失败", description: e.message }),
     });
@@ -104,7 +104,7 @@ export function DeveloperAppsPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  navigate(`/dashboard/apps/${app.id}`);
+                  navigate(`/dashboard/developer/apps/${app.id}`);
                 }
               }}
             >

@@ -71,6 +71,7 @@ createRoot(document.getElementById("root")!).render(
 
                 {/* Developer */}
                 <Route path="developer/apps" element={<DeveloperAppsPage />} />
+                <Route path="developer/apps/:id" element={<AppDetailPage />} />
 
                 {/* Domain 4: Management & Ops */}
                 <Route path="admin" element={<Navigate to="/dashboard/admin/overview" replace />} />
