@@ -626,6 +626,7 @@ func detectOutboundExt(filename, msgType string) string {
 // resolveMediaURLs returns a copy of items with raw CDN URLs replaced by
 // Hub proxy URLs so external apps can fetch media. Items without EQP
 // (already processed or text-only) are left unchanged.
+// RefMsg is handled one level deep, which matches WeChat's quoting model.
 func resolveMediaURLs(items []relay.MessageItem, baseURL, botDBID string) []relay.MessageItem {
 	out := make([]relay.MessageItem, len(items))
 	copy(out, items)
