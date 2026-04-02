@@ -630,20 +630,29 @@ func resolveMediaURLs(items []relay.MessageItem, baseURL, botDBID string) []rela
 	out := make([]relay.MessageItem, len(items))
 	copy(out, items)
 	for i := range out {
-		if out[i].Media == nil || out[i].Media.EQP == "" {
-			continue
+		resolveItemMedia(&out[i], baseURL, botDBID)
+		if out[i].RefMsg != nil {
+			ref := *out[i].RefMsg
+			resolveItemMedia(&ref.Item, baseURL, botDBID)
+			out[i].RefMsg = &ref
 		}
-		m := *out[i].Media
-		q := url.Values{}
-		q.Set("bot", botDBID)
-		q.Set("eqp", m.EQP)
-		q.Set("aes", m.AESKey)
-		q.Set("ct", mediaContentType(out[i].Type))
-		m.URL = fmt.Sprintf("%s/api/v1/channels/media?%s", baseURL, q.Encode())
-		m.EQP = ""
-		m.AESKey = ""
-		out[i].Media = &m
 	}
 	return out
+}
+
+func resolveItemMedia(item *relay.MessageItem, baseURL, botDBID string) {
+	if item.Media == nil || item.Media.EQP == "" {
+		return
+	}
+	m := *item.Media
+	q := url.Values{}
+	q.Set("bot", botDBID)
+	q.Set("eqp", m.EQP)
+	q.Set("aes", m.AESKey)
+	q.Set("ct", mediaContentType(item.Type))
+	m.URL = fmt.Sprintf("%s/api/v1/channels/media?%s", baseURL, q.Encode())
+	m.EQP = ""
+	m.AESKey = ""
+	item.Media = &m
 }
 

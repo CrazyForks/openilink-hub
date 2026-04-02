@@ -81,6 +81,55 @@ func TestResolveMediaURLs_NoMedia(t *testing.T) {
 	}
 }
 
+func TestResolveMediaURLs_RefMsg(t *testing.T) {
+	baseURL := "https://hub.example.com"
+	botDBID := "bot-123"
+
+	items := []relay.MessageItem{
+		{
+			Type: "text",
+			Text: "quoting an image",
+			RefMsg: &relay.RefMsg{
+				Title: "original sender",
+				Item: relay.MessageItem{
+					Type: "image",
+					Media: &relay.Media{
+						URL:       "https://wechat-cdn.example.com/ref-image",
+						EQP:       "eqp-ref-param",
+						AESKey:    "refkey",
+						MediaType: "image",
+					},
+				},
+			},
+		},
+	}
+
+	result := resolveMediaURLs(items, baseURL, botDBID)
+
+	ref := result[0].RefMsg
+	if ref == nil {
+		t.Fatal("RefMsg should be present")
+	}
+	if ref.Item.Media == nil {
+		t.Fatal("RefMsg item media should be present")
+	}
+	if ref.Item.Media.EQP != "" {
+		t.Errorf("RefMsg EQP should be cleared, got %q", ref.Item.Media.EQP)
+	}
+	if ref.Item.Media.AESKey != "" {
+		t.Errorf("RefMsg AESKey should be cleared, got %q", ref.Item.Media.AESKey)
+	}
+	wantURL := "https://hub.example.com/api/v1/channels/media?aes=refkey&bot=bot-123&ct=image%2Fjpeg&eqp=eqp-ref-param"
+	if ref.Item.Media.URL != wantURL {
+		t.Errorf("RefMsg media URL = %q, want %q", ref.Item.Media.URL, wantURL)
+	}
+
+	// Original not mutated
+	if items[0].RefMsg.Item.Media.EQP != "eqp-ref-param" {
+		t.Error("original RefMsg should not be mutated")
+	}
+}
+
 func TestResolveMediaURLs_AlreadyStorageURL(t *testing.T) {
 	items := []relay.MessageItem{
 		{
