@@ -54,13 +54,15 @@ func (m *Manager) deliverToApps(inst *Instance, msg provider.InboundMessage, p p
 		return
 	}
 
+	resolvedItems := resolveMediaURLs(p.relayItems, m.baseURL, inst.DBID)
+
 	event := appdelivery.NewEvent(eventType, map[string]any{
 		"message_id": msg.ExternalID,
 		"sender":     map[string]any{"id": msg.Sender, "role": "user"},
 		"group":      groupInfo(msg),
 		"content":    content,
 		"msg_type":   p.msgType,
-		"items":      p.relayItems,
+		"items":      resolvedItems,
 	})
 	event.TraceID = tracer.TraceID()
 
