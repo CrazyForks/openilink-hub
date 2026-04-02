@@ -632,22 +632,14 @@ func resolveMediaURLs(items []relay.MessageItem, baseURL, botDBID string) []rela
 			continue
 		}
 		m := *out[i].Media
-		m.URL = fmt.Sprintf("%s/api/v1/channels/media?bot=%s&eqp=%s&aes=%s&ct=%s",
-			baseURL, botDBID, m.EQP, m.AESKey, url.QueryEscape(mediaProxyContentType(out[i].Type)))
+		q := url.Values{}
+		q.Set("bot", botDBID)
+		q.Set("eqp", m.EQP)
+		q.Set("aes", m.AESKey)
+		q.Set("ct", mediaContentType(out[i].Type))
+		m.URL = fmt.Sprintf("%s/api/v1/channels/media?%s", baseURL, q.Encode())
 		out[i].Media = &m
 	}
 	return out
 }
 
-func mediaProxyContentType(itemType string) string {
-	switch itemType {
-	case "image":
-		return "image/jpeg"
-	case "voice":
-		return "audio/wav"
-	case "video":
-		return "video/mp4"
-	default:
-		return "application/octet-stream"
-	}
-}

@@ -40,7 +40,7 @@ func TestResolveMediaURLs(t *testing.T) {
 		t.Error("text item should have no media")
 	}
 
-	want := "https://hub.example.com/api/v1/channels/media?bot=bot-123&eqp=eqp-file-param&aes=abc123&ct=application%2Foctet-stream"
+	want := "https://hub.example.com/api/v1/channels/media?aes=abc123&bot=bot-123&ct=application%2Foctet-stream&eqp=eqp-file-param"
 	if result[1].Media.URL != want {
 		t.Errorf("file URL = %q, want %q", result[1].Media.URL, want)
 	}
@@ -48,7 +48,7 @@ func TestResolveMediaURLs(t *testing.T) {
 		t.Error("file size should be preserved")
 	}
 
-	wantImg := "https://hub.example.com/api/v1/channels/media?bot=bot-123&eqp=eqp-image-param&aes=def456&ct=image%2Fjpeg"
+	wantImg := "https://hub.example.com/api/v1/channels/media?aes=def456&bot=bot-123&ct=image%2Fjpeg&eqp=eqp-image-param"
 	if result[2].Media.URL != wantImg {
 		t.Errorf("image URL = %q, want %q", result[2].Media.URL, wantImg)
 	}
