@@ -41,6 +41,7 @@ type MessageItem struct {
 
 type Media struct {
 	URL         string `json:"url,omitempty"`
+	EQP         string `json:"eqp,omitempty"`
 	AESKey      string `json:"aes_key,omitempty"`
 	FileSize    int64  `json:"file_size,omitempty"`
 	MediaType   string `json:"media_type,omitempty"`

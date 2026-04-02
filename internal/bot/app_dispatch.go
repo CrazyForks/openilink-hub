@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	appdelivery "github.com/openilink/openilink-hub/internal/app"
 	"github.com/openilink/openilink-hub/internal/builtin"
 	"github.com/openilink/openilink-hub/internal/provider"
+	"github.com/openilink/openilink-hub/internal/relay"
 	"github.com/openilink/openilink-hub/internal/store"
 )
 
@@ -616,5 +618,36 @@ func detectOutboundExt(filename, msgType string) string {
 		return ".wav"
 	default:
 		return ""
+	}
+}
+
+// resolveMediaURLs returns a copy of items with raw CDN URLs replaced by
+// Hub proxy URLs so external apps can fetch media. Items without EQP
+// (already processed or text-only) are left unchanged.
+func resolveMediaURLs(items []relay.MessageItem, baseURL, botDBID string) []relay.MessageItem {
+	out := make([]relay.MessageItem, len(items))
+	copy(out, items)
+	for i := range out {
+		if out[i].Media == nil || out[i].Media.EQP == "" {
+			continue
+		}
+		m := *out[i].Media
+		m.URL = fmt.Sprintf("%s/api/v1/channels/media?bot=%s&eqp=%s&aes=%s&ct=%s",
+			baseURL, botDBID, m.EQP, m.AESKey, url.QueryEscape(mediaProxyContentType(out[i].Type)))
+		out[i].Media = &m
+	}
+	return out
+}
+
+func mediaProxyContentType(itemType string) string {
+	switch itemType {
+	case "image":
+		return "image/jpeg"
+	case "voice":
+		return "audio/wav"
+	case "video":
+		return "video/mp4"
+	default:
+		return "application/octet-stream"
 	}
 }

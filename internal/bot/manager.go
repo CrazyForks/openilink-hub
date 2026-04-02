@@ -817,6 +817,7 @@ func convertRelayItem(item provider.MessageItem) relay.MessageItem {
 	if item.Media != nil {
 		ri.Media = &relay.Media{
 			URL:         item.Media.URL,
+			EQP:         item.Media.EncryptQueryParam,
 			AESKey:      item.Media.AESKey,
 			FileSize:    item.Media.FileSize,
 			MediaType:   item.Media.MediaType,
