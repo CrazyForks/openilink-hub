@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -2862,24 +2863,29 @@ func TestAIToolImageReply(t *testing.T) {
 }
 
 // TestAppEventDelivery_HTTPAndWebSocket is an end-to-end integration test for
-// issue #208. It verifies both delivery paths:
+// issue #208. It verifies that all delivery channels fire independently:
 //
-//  1. HTTP (webhook): when no WebSocket is connected, an inbound message is
+//  1. HTTP-only: when no WebSocket is connected, an inbound message is
 //     delivered to the app's webhook URL.
 //
-//  2. WebSocket: once the app connects via /bot/v1/ws, subsequent inbound
-//     messages arrive over the WebSocket and the webhook is NOT called,
-//     confirming that WS takes priority over the HTTP handler.
+//  2. WS + HTTP: once the app connects via /bot/v1/ws, subsequent inbound
+//     messages arrive over the WebSocket AND the webhook is also called,
+//     confirming the channels are independent.
 func TestAppEventDelivery_HTTPAndWebSocket(t *testing.T) {
 	env := setup(t)
 	defer env.close()
 
 	// --- Webhook receiver ---
 	var webhookCalls atomic.Int32
+	var webhookMu sync.Mutex
 	var lastWebhookBody map[string]any
 	hookSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		webhookCalls.Add(1)
-		json.NewDecoder(r.Body).Decode(&lastWebhookBody)
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		webhookMu.Lock()
+		lastWebhookBody = body
+		webhookMu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer hookSrv.Close()
@@ -2929,13 +2935,25 @@ func TestAppEventDelivery_HTTPAndWebSocket(t *testing.T) {
 		Sender: "user-http@test",
 		Text:   "hello via http",
 	})
-	time.Sleep(600 * time.Millisecond)
+	// Poll until webhook is called instead of a fixed sleep.
+	deadline := time.After(3 * time.Second)
+	for webhookCalls.Load() < 1 {
+		select {
+		case <-deadline:
+			t.Fatal("phase 1: timed out waiting for webhook call")
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
 
 	if n := webhookCalls.Load(); n != 1 {
 		t.Errorf("phase 1: want 1 webhook call, got %d", n)
 	} else {
 		// Verify payload shape
-		event, _ := lastWebhookBody["event"].(map[string]any)
+		webhookMu.Lock()
+		body := lastWebhookBody
+		webhookMu.Unlock()
+		event, _ := body["event"].(map[string]any)
 		data, _ := event["data"].(map[string]any)
 		if data["content"] != "hello via http" {
 			t.Errorf("phase 1: webhook content = %v, want 'hello via http'", data["content"])
@@ -2952,12 +2970,20 @@ func TestAppEventDelivery_HTTPAndWebSocket(t *testing.T) {
 	}
 	defer ws.Close()
 
-	// Consume the init message
+	// Consume and verify the init message
 	ws.SetReadDeadline(time.Now().Add(3 * time.Second))
-	if _, _, err := ws.ReadMessage(); err != nil {
+	_, initRaw, err := ws.ReadMessage()
+	if err != nil {
 		t.Fatalf("ws: read init: %v", err)
 	}
 	ws.SetReadDeadline(time.Time{})
+	var initMsg map[string]any
+	if err := json.Unmarshal(initRaw, &initMsg); err != nil {
+		t.Fatalf("ws: unmarshal init: %v", err)
+	}
+	if initMsg["type"] != "init" {
+		t.Errorf("ws init type = %v, want 'init'", initMsg["type"])
+	}
 
 	webhookBefore := webhookCalls.Load()
 

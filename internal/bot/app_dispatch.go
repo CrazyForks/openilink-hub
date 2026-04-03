@@ -124,7 +124,7 @@ func (m *Manager) tryDeliverMention(inst *Instance, msg provider.InboundMessage,
 
 // deliverEventToApp delivers an event to a single app installation.
 // The three delivery channels (WebSocket, builtin handler, webhook) are
-// independent — each fires if its precondition is met, none blocks the others.
+// independent — each fires if its precondition is met, none skips the others.
 func (m *Manager) deliverEventToApp(inst *Instance, installation *store.AppInstallation, event *appdelivery.Event, sender string, tracer *store.Tracer, rootSpan *store.SpanBuilder) {
 	// Channel 1: WebSocket (installation-level, then app-level)
 	if m.appWSHub != nil {

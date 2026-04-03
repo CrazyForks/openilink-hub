@@ -224,13 +224,14 @@ func TestDeliverToApps_WSAndBuiltinBothFire(t *testing.T) {
 		appSlug = "fake-bridge-ws"
 	)
 
-	// Register a fake builtin so the old short-circuit code path exists.
+	// Register a fake builtin so the channel fires.
 	fakeHandler := &fakeBuiltinHandler{}
 	builtin.Register(builtin.AppManifest{
 		Slug:   appSlug,
 		Events: []string{"message"},
 		Scopes: []string{"message:read"},
 	}, fakeHandler)
+	t.Cleanup(func() { builtin.Deregister(appSlug) })
 
 	ms := memstore.New()
 	ms.AddApp(&store.App{
@@ -307,6 +308,7 @@ func TestDeliverToApps_BuiltinHandlerWhenNoWS(t *testing.T) {
 		Events: []string{"message"},
 		Scopes: []string{"message:read"},
 	}, fakeHandler)
+	t.Cleanup(func() { builtin.Deregister(appSlug) })
 
 	ms := memstore.New()
 	ms.AddApp(&store.App{
