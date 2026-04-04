@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -211,6 +212,27 @@ export function AdminOverviewPage() {
                     onChange={(e) => updateAIConfig({ api_key: e.target.value })}
                     placeholder="••••••••"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">系统提示词</Label>
+                  <Textarea
+                    rows={4}
+                    value={effectiveAIConfig?.system_prompt || ""}
+                    onChange={(e) => updateAIConfig({ system_prompt: e.target.value })}
+                    placeholder="设置 AI 的系统角色提示词"
+                    className="resize-y text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">历史消息轮数</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={effectiveAIConfig?.max_history || ""}
+                    onChange={(e) => updateAIConfig({ max_history: e.target.value })}
+                    placeholder="默认 20 轮"
+                  />
+                  <p className="text-xs text-muted-foreground">AI 对话时携带的历史消息轮数，0 表示不携带历史。</p>
                 </div>
               </TabsContent>
 
