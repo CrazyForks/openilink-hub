@@ -18,11 +18,10 @@ var PendingBinds = struct {
 }{M: make(map[string]*bindEntry)}
 
 type bindEntry struct {
-	client    *ilinkSDK.Client
-	qrCode    string
-	UserID    string
-	result    *provider.BindPollResult // cached terminal result for reconnecting clients
-	resultAt  time.Time
+	client *ilinkSDK.Client
+	qrCode string
+	UserID string
+	result *provider.BindPollResult // cached terminal result for reconnecting clients
 }
 
 // StartBind initiates a QR code bind flow.
@@ -51,14 +50,15 @@ func StartBind(ctx context.Context, userID string) (sessionID, qrURL string, err
 func PollBind(ctx context.Context, sessionID string) (*provider.BindPollResult, error) {
 	PendingBinds.Lock()
 	entry, ok := PendingBinds.M[sessionID]
+	// Return cached terminal result for reconnecting clients (under lock).
+	if ok && entry.result != nil {
+		r := entry.result
+		PendingBinds.Unlock()
+		return r, nil
+	}
 	PendingBinds.Unlock()
 	if !ok {
 		return nil, fmt.Errorf("session not found")
-	}
-
-	// Return cached terminal result for reconnecting clients.
-	if entry.result != nil {
-		return entry.result, nil
 	}
 
 	status, err := entry.client.PollQRStatus(ctx, entry.qrCode)
@@ -98,16 +98,15 @@ func PollBind(ctx context.Context, sessionID string) (*provider.BindPollResult, 
 
 		result := &provider.BindPollResult{Status: "confirmed", Credentials: credsJSON}
 
-		// Cache the result instead of deleting — reconnecting clients need it.
+		// Cache the result under lock — reconnecting clients need it.
 		// Schedule cleanup after 60s to avoid leaking memory.
+		PendingBinds.Lock()
 		entry.result = result
-		entry.resultAt = time.Now()
+		PendingBinds.Unlock()
 		go func() {
 			time.Sleep(60 * time.Second)
 			PendingBinds.Lock()
-			if e, ok := PendingBinds.M[sessionID]; ok && e.result != nil {
-				delete(PendingBinds.M, sessionID)
-			}
+			delete(PendingBinds.M, sessionID)
 			PendingBinds.Unlock()
 		}()
 
