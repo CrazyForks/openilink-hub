@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { KeyRound, Shield, User, Lock, ArrowRight, Loader2, Github, X, QrCode, ChevronDown } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import QRCode from "qrcode";
@@ -44,6 +44,8 @@ export function LoginPage() {
   const [qrUrl, setQrUrl] = useState("");
   const [scanStatus, setScanStatus] = useState<"idle" | "loading" | "wait" | "scanned" | "error">("idle");
   const [scanMessage, setScanMessage] = useState("");
+  const scanWsRef = useRef<WebSocket | null>(null);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Password login state
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -66,9 +68,13 @@ export function LoginPage() {
     }
   }, [infoData]);
 
-  // Auto-start scan login on mount
+  // Auto-start scan login on mount; cleanup WS/timer on unmount
   useEffect(() => {
     startScanLogin();
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      if (scanWsRef.current) scanWsRef.current.close();
+    };
   }, []);
 
   async function startScanLogin() {
@@ -99,10 +105,10 @@ export function LoginPage() {
     const MAX_RETRIES = 5;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/auth/scan/status/${sessionID}`);
-    let settled = false; // true when login completes or a terminal error occurs
+    scanWsRef.current = ws;
+    let settled = false;
 
     ws.onmessage = (e) => {
-      retries = 0; // reset on successful message
       const d = JSON.parse(e.data);
       if (d.event === "status") {
         if (d.status === "wait") {
@@ -135,7 +141,7 @@ export function LoginPage() {
       if (retries < MAX_RETRIES) {
         const delay = Math.min(1000 * 2 ** retries, 8000);
         setScanMessage("连接中断，正在重连...");
-        setTimeout(() => connectScanWS(sessionID, retries + 1), delay);
+        scanTimerRef.current = setTimeout(() => connectScanWS(sessionID, retries + 1), delay);
       } else {
         setScanStatus("error");
         setScanMessage("连接中断，请刷新重试");

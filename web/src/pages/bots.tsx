@@ -54,6 +54,16 @@ export function BotsPage() {
   const [qrUrl, setQrUrl] = useState("");
   const [bindStatus, setBindStatus] = useState("");
   const navigate = useNavigate();
+  const bindWsRef = useRef<WebSocket | null>(null);
+  const bindTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup WS/timer when dialog closes or component unmounts
+  useEffect(() => {
+    return () => {
+      if (bindTimerRef.current) clearTimeout(bindTimerRef.current);
+      if (bindWsRef.current) bindWsRef.current.close();
+    };
+  }, []);
 
   async function startBind() {
     setBinding(true);
@@ -74,10 +84,10 @@ export function BotsPage() {
     const ws = new WebSocket(
       `${protocol}//${window.location.host}/api/bots/bind/status/${sessionID}`,
     );
+    bindWsRef.current = ws;
     let settled = false;
 
     ws.onmessage = (e) => {
-      retries = 0;
       const data = JSON.parse(e.data);
       if (data.event === "status") {
         if (data.status === "scanned") setBindStatus("已扫码，请在手机上点击确认...");
@@ -103,7 +113,7 @@ export function BotsPage() {
       if (retries < MAX_RETRIES) {
         const delay = Math.min(1000 * 2 ** retries, 8000);
         setBindStatus("连接中断，正在重连...");
-        setTimeout(() => connectBindWS(sessionID, retries + 1), delay);
+        bindTimerRef.current = setTimeout(() => connectBindWS(sessionID, retries + 1), delay);
       } else {
         setBindStatus("连接中断，请重试");
         setBinding(false);
