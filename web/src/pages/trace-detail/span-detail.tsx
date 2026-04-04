@@ -15,7 +15,7 @@ import {
   formatDuration,
   StatusIcon,
 } from "@/lib/trace-utils";
-import { Clock, Tag, Zap, Coins } from "lucide-react";
+import { Clock, Tag, Zap, Coins, XCircle } from "lucide-react";
 
 interface SpanDetailProps {
   span: TraceSpan | null;
@@ -79,12 +79,20 @@ export function SpanDetail({ span, open, onClose }: SpanDetailProps) {
           </div>
           <SheetTitle className="font-mono text-sm truncate">{displaySpan.name}</SheetTitle>
           {displaySpan.status_message && (
-            <SheetDescription className="text-destructive text-xs whitespace-pre-wrap break-words">{displaySpan.status_message}</SheetDescription>
+            <SheetDescription className="text-destructive text-xs line-clamp-2">{displaySpan.status_message}</SheetDescription>
           )}
         </SheetHeader>
 
         <ScrollArea className="h-[calc(100vh-120px)] px-4 py-3">
           <div className="space-y-5">
+            {/* Error */}
+            {displaySpan.status_message && (
+              <Section title="Error" icon={<XCircle className="w-3 h-3 text-destructive" />}>
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive whitespace-pre-wrap break-words font-mono">
+                  {displaySpan.status_message}
+                </div>
+              </Section>
+            )}
             {/* Timing */}
             <Section title="Timing" icon={<Clock className="w-3 h-3" />}>
               <div className="grid grid-cols-2 gap-2 text-xs">

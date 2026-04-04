@@ -439,9 +439,7 @@ func (s *AI) collectTools(botID string) []ai.Tool {
 				continue
 			}
 			params := t.Parameters
-			if len(params) == 0 || string(params) == "null" {
-				params = json.RawMessage(`{"type":"object","properties":{}}`)
-			}
+			params = ensureObjectSchema(params)
 			// Use installation ID as prefix for unique routing
 			tools = append(tools, ai.Tool{
 				Type: "function",
@@ -454,6 +452,35 @@ func (s *AI) collectTools(botID string) []ai.Tool {
 		}
 	}
 	return tools
+}
+
+// ensureObjectSchema normalises a tool parameters value so it is always a
+// valid JSON Schema with "type":"object".  It handles three common cases:
+//   - empty / literal "null"  → default empty-object schema
+//   - bare properties map (keys are property names, not "type"/"properties")
+//     → wrapped into {"type":"object","properties":…}
+//   - already well-formed     → returned as-is
+func ensureObjectSchema(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
+		return json.RawMessage(`{"type":"object","properties":{}}`)
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return json.RawMessage(`{"type":"object","properties":{}}`)
+	}
+	// Already has "type" → trust it
+	if _, ok := m["type"]; ok {
+		return raw
+	}
+	// Looks like a bare properties map – wrap it
+	wrapped, err := json.Marshal(map[string]any{
+		"type":       "object",
+		"properties": m,
+	})
+	if err != nil {
+		return json.RawMessage(`{"type":"object","properties":{}}`)
+	}
+	return wrapped
 }
 
 // executeToolCall delivers a tool call to the corresponding app and returns the result.
