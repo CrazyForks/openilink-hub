@@ -333,7 +333,7 @@ RP_ORIGIN=https://your-domain.example.com   # 必须带 scheme，不要带末尾
 RP_ID=your-domain.example.com               # WebAuthn / Passkey 用的域名
 ```
 
-同理，如果开了对象存储且未设置 `STORAGE_PUBLIC_URL`，媒体 URL 也会基于 `RP_ORIGIN` 拼接，所以这个变量配对了一举两得。
+同理，如果开了对象存储且未设置 `STORAGE_PUBLIC_URL`，媒体 URL 也会基于 `RP_ORIGIN` 拼接，所以这个变量配对了一举两得。如果对象存储走的是独立的 CDN / 域名，请额外设置 `STORAGE_PUBLIC_URL`。
 
 ### 从源码构建
 
