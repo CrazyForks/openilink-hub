@@ -324,6 +324,17 @@ volumes:
 
 前面放个 Nginx / Caddy 做 HTTPS 反代就行。
 
+### 部署到反向代理 / PaaS（Zeabur / Railway / Render 等）
+
+只要 Hub 不是直接通过 `http://localhost:9800` 被访问，就**必须**设置 `RP_ORIGIN` 为浏览器实际访问的地址，否则应用授权（App OAuth）回调链接会跳回 `localhost:9800`，导致授权失败。
+
+```bash
+RP_ORIGIN=https://your-domain.example.com   # 必须带 scheme，不要带末尾 /
+RP_ID=your-domain.example.com               # WebAuthn / Passkey 用的域名
+```
+
+同理，如果开了对象存储且未设置 `STORAGE_PUBLIC_URL`，媒体 URL 也会基于 `RP_ORIGIN` 拼接，所以这个变量配对了一举两得。
+
 ### 从源码构建
 
 ```bash

@@ -79,6 +79,14 @@ func main() {
 
 	cfg := config.Parse()
 
+	// Warn if RP_ORIGIN is left at the default. OAuth callback URLs and
+	// storage public URLs are derived from it, so deployments behind a
+	// reverse proxy or on a public host must override it or app
+	// authorization links will point at localhost. See issue #216.
+	if cfg.RPOrigin == "http://localhost:9800" {
+		slog.Warn("RP_ORIGIN is using the default value; OAuth callbacks and media URLs will point at localhost. Set RP_ORIGIN to your public URL (e.g. https://hub.example.com) when deploying behind a reverse proxy or on a public host.")
+	}
+
 	// Ensure data directory exists for SQLite
 	if !strings.HasPrefix(cfg.DBPath, "postgres") {
 		if err := config.EnsureDataDir(); err != nil {
