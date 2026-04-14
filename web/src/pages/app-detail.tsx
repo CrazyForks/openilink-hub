@@ -656,6 +656,7 @@ const ACTION_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
 function DistributionSection({ app, onUpdate }: { app: any; onUpdate: () => void }) {
   const [loading, setLoading] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     api.listAppReviews(app.id).then(setReviews).catch(() => {});
@@ -667,7 +668,9 @@ function DistributionSection({ app, onUpdate }: { app: any; onUpdate: () => void
       await api.requestListing(app.id);
       onUpdate();
       api.listAppReviews(app.id).then(setReviews).catch(() => {});
-    } catch {}
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "提交审核失败", description: e.message });
+    }
     setLoading(false);
   }
 
