@@ -154,7 +154,7 @@ func (db *DB) GetBotsNeedingReminder() ([]store.Bot, error) {
 		AND reminder_hours > 0
 		AND last_msg_at IS NOT NULL
 		AND last_msg_at < ? - 3600 * reminder_hours
-		AND (last_reminded_at IS NULL OR last_reminded_at < ? - 3600)`, now, now)
+		AND (last_reminded_at IS NULL OR last_reminded_at < last_msg_at)`, now)
 	if err != nil {
 		return nil, err
 	}

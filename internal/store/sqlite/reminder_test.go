@@ -145,7 +145,7 @@ func TestGetBotsNeedingReminder_AlreadyRemindedRecently(t *testing.T) {
 	}
 }
 
-func TestGetBotsNeedingReminder_DueAgainAfterCooldown(t *testing.T) {
+func TestGetBotsNeedingReminder_OnlyOncePerSilenceWindow(t *testing.T) {
 	db := openTestDB(t)
 	clock := &fakeClock{t: time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)}
 	db.SetClock(clock)
@@ -159,20 +159,34 @@ func TestGetBotsNeedingReminder_DueAgainAfterCooldown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Advance 22.5 hours — due.
+	// Advance 22.5 hours — due, send reminder.
 	clock.Advance(22*time.Hour + 30*time.Minute)
 	if err := db.MarkBotReminded(b.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	// Advance 1 hour + 1 minute past last reminder — should be due again.
-	clock.Advance(1*time.Hour + time.Minute)
+	// Even days later, without a new inbound message, should NOT fire again.
+	clock.Advance(72 * time.Hour)
 	bots, err := db.GetBotsNeedingReminder()
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(bots) != 0 {
+		t.Errorf("expected 0 bots (already reminded for this silence window), got %d", len(bots))
+	}
+
+	// New inbound message resets last_msg_at past last_reminded_at.
+	if err := db.IncrBotMsgCount(b.ID); err != nil {
+		t.Fatal(err)
+	}
+	// Advance another 23h — silent again, eligible to remind once more.
+	clock.Advance(23 * time.Hour)
+	bots, err = db.GetBotsNeedingReminder()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(bots) != 1 {
-		t.Errorf("expected 1 bot (cooldown passed), got %d", len(bots))
+		t.Errorf("expected 1 bot (new silence window after fresh message), got %d", len(bots))
 	}
 }
 
